@@ -2,13 +2,9 @@
 //  1) chamada autenticada do frontend -> devolve a URL de login da Steam
 //  2) callback da Steam (GET com openid.mode=id_res) -> valida e salva o steam_id
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 // Assina o user_id num "state" simples pra confirmar, no callback, quem iniciou
 // o login (a Steam não tem um parâmetro de state nativo como o OAuth2).
@@ -35,11 +31,11 @@ async function verify(state: string): Promise<string | null> {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   const url = new URL(req.url)
-  const functionUrl = `${url.origin}${url.pathname}`
+  const functionUrl = `${Deno.env.get('SUPABASE_URL')!}/functions/v1/steam-connect`
   const siteUrl = Deno.env.get('SITE_URL')!
 
   // Fase 2: callback vindo da Steam
@@ -119,7 +115,7 @@ Deno.serve(async (req) => {
     'openid.ns': 'http://specs.openid.net/auth/2.0',
     'openid.mode': 'checkid_setup',
     'openid.return_to': returnTo,
-    'openid.realm': siteUrl,
+    'openid.realm': new URL(functionUrl).origin,
     'openid.identity': 'http://specs.openid.net/auth/2.0/identifier_select',
     'openid.claimed_id': 'http://specs.openid.net/auth/2.0/identifier_select',
   })

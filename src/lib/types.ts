@@ -23,6 +23,8 @@ export interface Trophy {
   external_trophy_id: string
   name: string
   description: string | null
+  name_pt: string | null
+  description_pt: string | null
   icon_url: string | null
   type: TrophyType
   hidden: boolean
@@ -33,6 +35,7 @@ export interface UserGame {
   game_id: string
   progress_pct: number
   platinated: boolean
+  favorite: boolean
   last_synced_at: string | null
 }
 
@@ -47,4 +50,6 @@ export interface UserTrophy {
 export type GameWithProgress = Game & {
   progress_pct: number
   platinated: boolean
+  favorite: boolean
+  last_synced_at: string | null
 }

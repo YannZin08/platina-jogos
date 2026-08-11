@@ -1,89 +1,188 @@
 import * as React from 'react'
 import { Link } from 'react-router-dom'
-import { RefreshCw, Check } from 'lucide-react'
+import { RefreshCw, Check, Settings as SettingsIcon, Search, Star } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
+import { useLanguage } from '@/i18n/LanguageContext'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { GameCover } from '@/components/GameCover'
 import type { Game, GameWithProgress } from '@/lib/types'
 
 type Filter = 'todos' | 'platinados' | 'pendentes'
+type Sort = 'recent' | 'progress' | null
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const { t } = useLanguage()
   const [games, setGames] = React.useState<GameWithProgress[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [syncing, setSyncing] = React.useState(false)
   const [filter, setFilter] = React.useState<Filter>('todos')
+  const [sort, setSort] = React.useState<Sort>(null)
+  const [search, setSearch] = React.useState('')
 
-  const loadGames = React.useCallback(async () => {
-    if (!user) return
-    setLoading(true)
+  const loadGames = React.useCallback(
+    async (showLoading = true) => {
+      if (!user) return
+      if (showLoading) setLoading(true)
 
-    const { data } = await supabase
-      .from('user_games')
-      .select('progress_pct, platinated, games(*)')
-      .eq('user_id', user.id)
+      const { data } = await supabase
+        .from('user_games')
+        .select('progress_pct, platinated, favorite, last_synced_at, games(*)')
+        .eq('user_id', user.id)
 
-    type Row = { progress_pct: number; platinated: boolean; games: Game | null }
-    const rows = (data ?? []) as unknown as Row[]
+      type Row = {
+        progress_pct: number
+        platinated: boolean
+        favorite: boolean
+        last_synced_at: string | null
+        games: Game | null
+      }
+      const rows = (data ?? []) as unknown as Row[]
 
-    const mapped: GameWithProgress[] = rows
-      .filter((row) => row.games)
-      .map((row) => ({
-        ...(row.games as Game),
-        progress_pct: row.progress_pct,
-        platinated: row.platinated,
-      }))
+      const mapped: GameWithProgress[] = rows
+        .filter((row) => row.games)
+        .map((row) => ({
+          ...(row.games as Game),
+          progress_pct: row.progress_pct,
+          platinated: row.platinated,
+          favorite: row.favorite,
+          last_synced_at: row.last_synced_at,
+        }))
 
-    setGames(mapped)
-    setLoading(false)
-  }, [user])
+      setGames(mapped)
+      if (showLoading) setLoading(false)
+    },
+    [user],
+  )
 
-  React.useEffect(() => {
-    loadGames()
+  const syncNow = React.useCallback(async () => {
+    setSyncing(true)
+    // Conta não conectada ou function fora do ar não deve travar a tela;
+    // é uma sincronização silenciosa em segundo plano.
+    await Promise.allSettled([supabase.functions.invoke('steam-sync')])
+    await loadGames(false)
+    setSyncing(false)
   }, [loadGames])
 
-  const filtered = games.filter((g) => {
-    if (filter === 'platinados') return g.platinated
-    if (filter === 'pendentes') return !g.platinated
-    return true
-  })
+  React.useEffect(() => {
+    loadGames().then(() => syncNow())
+  }, [loadGames, syncNow])
+
+  async function toggleFavorite(e: React.MouseEvent, gameId: string, current: boolean) {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!user) return
+    setGames((prev) => prev.map((g) => (g.id === gameId ? { ...g, favorite: !current } : g)))
+    await supabase
+      .from('user_games')
+      .update({ favorite: !current })
+      .eq('user_id', user.id)
+      .eq('game_id', gameId)
+  }
 
   const platinatedCount = games.filter((g) => g.platinated).length
+
+  const visible = games
+    .filter((g) => {
+      if (filter === 'platinados') return g.platinated
+      if (filter === 'pendentes') return !g.platinated
+      return true
+    })
+    .filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
+    .sort((a, b) => {
+      if (a.favorite !== b.favorite) return a.favorite ? -1 : 1
+      if (sort === 'progress') {
+        const diff = b.progress_pct - a.progress_pct
+        if (diff !== 0) return diff
+      } else if (sort === 'recent') {
+        const diff = (b.last_synced_at ?? '').localeCompare(a.last_synced_at ?? '')
+        if (diff !== 0) return diff
+      }
+      // Ordem alfabética sempre como base/critério de desempate.
+      return a.name.localeCompare(b.name)
+    })
+
+  const FILTER_LABEL: Record<Filter, string> = {
+    todos: t('dashboard.filterAll'),
+    platinados: t('dashboard.filterPlatinated'),
+    pendentes: t('dashboard.filterPending'),
+  }
+
+  const SORT_LABEL: Record<Exclude<Sort, null>, string> = {
+    recent: t('dashboard.sortRecent'),
+    progress: t('dashboard.sortProgress'),
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-display text-lg font-medium text-text">Meus jogos</h1>
+          <h1 className="font-display text-lg font-medium text-text">{t('dashboard.title')}</h1>
           <p className="mt-1 text-sm text-text-secondary">
             {games.length > 0
-              ? `${platinatedCount} platinados de ${games.length}`
-              : 'Conecte uma conta para começar'}
+              ? t('dashboard.summary', { platinated: platinatedCount, total: games.length })
+              : t('dashboard.emptySummary')}
           </p>
         </div>
-        <Button variant="secondary" size="sm" onClick={loadGames}>
-          <RefreshCw className="h-4 w-4" />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={syncNow} disabled={syncing}>
+            <RefreshCw className={`h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? t('dashboard.syncing') : t('dashboard.update')}
+          </Button>
+          <Link to="/settings">
+            <Button variant="ghost" size="sm">
+              <SettingsIcon className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {games.length > 0 && (
-        <div className="mb-6 flex gap-2">
-          {(['todos', 'platinados', 'pendentes'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`rounded-lg px-3.5 py-1.5 text-sm capitalize transition-colors ${
-                filter === f
-                  ? 'bg-accent/15 text-accent'
-                  : 'text-text-secondary hover:bg-surface'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
+        <>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-secondary" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('dashboard.searchPlaceholder')}
+                className="pl-9"
+              />
+            </div>
+
+            <div className="flex gap-2">
+              {(['recent', 'progress'] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setSort(sort === s ? null : s)}
+                  className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${
+                    sort === s ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:bg-surface'
+                  }`}
+                >
+                  {SORT_LABEL[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mb-6 flex gap-2">
+            {(['todos', 'platinados', 'pendentes'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${
+                  filter === f
+                    ? 'bg-accent/15 text-accent'
+                    : 'text-text-secondary hover:bg-surface'
+                }`}
+              >
+                {FILTER_LABEL[f]}
+              </button>
+            ))}
+          </div>
+        </>
       )}
 
       {loading ? (
@@ -94,22 +193,32 @@ export default function Dashboard() {
         </div>
       ) : games.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border py-16 text-center">
-          <p className="mb-1 text-text">Nenhum jogo ainda</p>
-          <p className="mb-5 text-sm text-text-secondary">
-            Conecte sua conta PSN ou Steam nas configurações para importar seus troféus.
-          </p>
+          <p className="mb-1 text-text">{t('dashboard.emptyTitle')}</p>
+          <p className="mb-5 text-sm text-text-secondary">{t('dashboard.emptyDescription')}</p>
           <Link to="/settings">
-            <Button>Ir para configurações</Button>
+            <Button>{t('dashboard.goToSettings')}</Button>
           </Link>
         </div>
+      ) : visible.length === 0 ? (
+        <p className="py-16 text-center text-sm text-text-secondary">
+          {t('dashboard.noResults', { query: search })}
+        </p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((game) => (
+          {visible.map((game) => (
             <Link
               key={game.id}
               to={`/games/${game.id}`}
-              className="overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong"
+              className="relative overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong"
             >
+              <button
+                onClick={(e) => toggleFavorite(e, game.id, game.favorite)}
+                aria-label={game.favorite ? t('dashboard.favoriteRemove') : t('dashboard.favoriteAdd')}
+                className="absolute right-3 top-3 z-10 text-text-secondary hover:text-gold"
+              >
+                <Star className={`h-4 w-4 ${game.favorite ? 'fill-gold text-gold' : ''}`} />
+              </button>
+
               <div className="aspect-[460/215] w-full bg-bg">
                 <GameCover game={game} className="h-full w-full object-cover" />
               </div>
@@ -132,12 +241,15 @@ export default function Dashboard() {
                 {game.platinated ? (
                   <div className="flex items-center gap-1 text-xs font-medium text-success">
                     <Check className="h-3.5 w-3.5" />
-                    {game.platform === 'psn' ? 'Platinado' : '100% completo'}
+                    {game.platform === 'psn'
+                      ? t('dashboard.platinatedBadgePsn')
+                      : t('dashboard.platinatedBadgeSteam')}
                   </div>
                 ) : (
                   <div className="text-xs text-text-secondary">
-                    {Math.round(game.progress_pct)}%{' '}
-                    {game.platform === 'psn' ? 'dos troféus' : 'das conquistas'}
+                    {game.platform === 'psn'
+                      ? t('dashboard.progressPsn', { pct: Math.round(game.progress_pct) })
+                      : t('dashboard.progressSteam', { pct: Math.round(game.progress_pct) })}
                   </div>
                 )}
               </div>

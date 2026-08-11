@@ -1,12 +1,14 @@
 import * as React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useLanguage } from '@/i18n/LanguageContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export default function Login() {
   const { user, signIn, signUp, resetPassword } = useAuth()
+  const { t } = useLanguage()
   const [mode, setMode] = React.useState<'signin' | 'signup' | 'forgot'>('signin')
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
@@ -54,45 +56,49 @@ export default function Login() {
 
         <div className="rounded-xl border border-border bg-surface p-6">
           <h1 className="font-display mb-1 text-lg font-medium text-text">
-            {mode === 'signin' ? 'Entrar' : mode === 'signup' ? 'Criar conta' : 'Redefinir senha'}
+            {mode === 'signin'
+              ? t('login.signInTitle')
+              : mode === 'signup'
+                ? t('login.signUpTitle')
+                : 'Redefinir senha'}
           </h1>
           <p className="mb-6 text-sm text-text-secondary">
             {mode === 'signin'
-              ? 'Acesse sua conta para ver seus jogos e troféus.'
+              ? t('login.signInSubtitle')
               : mode === 'signup'
-                ? 'Leva menos de um minuto.'
+                ? t('login.signUpSubtitle')
                 : 'Informe seu e-mail e enviaremos um link pra você criar uma nova senha.'}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'signup' && (
               <div className="space-y-1.5">
-                <Label htmlFor="username">Nome de usuário</Label>
+                <Label htmlFor="username">{t('login.usernameLabel')}</Label>
                 <Input
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="seu_nick"
+                  placeholder={t('login.usernamePlaceholder')}
                   required
                 />
               </div>
             )}
 
             <div className="space-y-1.5">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">{t('login.emailLabel')}</Label>
               <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="voce@email.com"
+                placeholder={t('login.emailPlaceholder')}
                 required
               />
             </div>
 
             {mode !== 'forgot' && (
               <div className="space-y-1.5">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password">{t('login.passwordLabel')}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -128,11 +134,11 @@ export default function Login() {
 
             <Button type="submit" disabled={submitting} className="w-full">
               {submitting
-                ? 'Aguarde…'
+                ? t('login.submitWait')
                 : mode === 'signin'
-                  ? 'Entrar'
+                  ? t('login.submitSignIn')
                   : mode === 'signup'
-                    ? 'Criar conta'
+                    ? t('login.submitSignUp')
                     : 'Enviar link de redefinição'}
             </Button>
           </form>
@@ -150,7 +156,7 @@ export default function Login() {
             onClick={() => switchMode(mode === 'signin' ? 'signup' : 'signin')}
             className="mt-4 w-full text-center text-sm text-text-secondary hover:text-text"
           >
-            {mode === 'signin' ? 'Não tem conta? Criar uma' : 'Já tem conta? Entrar'}
+            {mode === 'signin' ? t('login.toggleToSignUp') : t('login.toggleToSignIn')}
           </button>
         )}
       </div>

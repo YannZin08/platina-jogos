@@ -2,23 +2,37 @@
 // Só sincroniza jogos com tempo de jogo > 0, pra manter o tempo de execução da function razoável
 // (uma biblioteca Steam grande pode ter centenas de jogos — dá pra paginar isso depois).
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
 const STEAM_API = 'https://api.steampowered.com'
 const COVER_BUCKET = 'game-covers'
-
-// O navegador manda um preflight OPTIONS antes de qualquer chamada com
-// Authorization; sem isso ser respondido com esses headers, a chamada de
-// verdade (POST) nunca sai do navegador.
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
 interface OwnedGame {
   appid: number
   name: string
   img_icon_url: string
   playtime_forever: number
+}
+
+interface SteamAchievementSchema {
+  name: string
+  displayName: string
+  description?: string
+  icon: string
+  hidden: number
+}
+
+// l=brazilian pede a localização pt-BR da Steam; jogos sem essa tradução
+// simplesmente devolvem o mesmo texto do inglês.
+async function fetchAchievementSchema(
+  appid: string,
+  steamApiKey: string,
+  lang?: string,
+): Promise<SteamAchievementSchema[]> {
+  const url = `${STEAM_API}/ISteamUserStats/GetSchemaForGame/v2/?key=${steamApiKey}&appid=${appid}${lang ? `&l=${lang}` : ''}`
+  const res = await fetch(url)
+  const data = await res.json()
+  return data?.game?.availableGameStats?.achievements ?? []
 }
 
 // A Steam não garante a mesma URL de capa pra todo jogo: títulos lançados
@@ -114,7 +128,7 @@ async function migrateCovers(
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
@@ -188,29 +202,24 @@ Deno.serve(async (req) => {
         .eq('external_id', appid)
         .maybeSingle()
 
-      // Sempre busca o schema em português (Steam localiza nome/descrição das
-      // conquistas por idioma; sem o "l=brazilian" vem em inglês por padrão).
-      // Roda pra jogos já cacheados também, pra corrigir/atualizar a tradução
-      // sem precisar de uma migração separada.
-      const schemaRes = await fetch(
-        `${STEAM_API}/ISteamUserStats/GetSchemaForGame/v2/?key=${steamApiKey}&appid=${appid}&l=brazilian`,
-      )
-      const schema = await schemaRes.json()
-      const achievements: { name: string; displayName: string; description?: string; icon: string; hidden: number }[] =
-        schema?.game?.availableGameStats?.achievements ?? []
-
-      if (achievements.length === 0) {
-        // jogo sem conquistas, não tem o que rastrear
-        noAchievementsCount++
-        continue
-      }
-
-      const fallbackIconUrl = ownedGame.img_icon_url
-        ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${ownedGame.img_icon_url}.jpg`
-        : null
-
       if (!game) {
+        const [achievements, achievementsPt] = await Promise.all([
+          fetchAchievementSchema(appid, steamApiKey),
+          fetchAchievementSchema(appid, steamApiKey, 'brazilian'),
+        ])
+
+        if (achievements.length === 0) {
+          // jogo sem conquistas, não tem o que rastrear
+          noAchievementsCount++
+          continue
+        }
+
+        const ptByName = new Map(achievementsPt.map((a) => [a.name, a]))
         const cachedCover = await cacheCover(admin, appid)
+        const fallbackIconUrl = ownedGame.img_icon_url
+          ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${ownedGame.img_icon_url}.jpg`
+          : null
+
         const { data: inserted } = await admin
           .from('games')
           .insert({
@@ -223,24 +232,60 @@ Deno.serve(async (req) => {
           .select('id, icon_url')
           .single()
         game = inserted
-      } else if (!game.icon_url?.includes(`/${COVER_BUCKET}/`)) {
-        // Jogo já cacheado antes dessa mudança: migra a capa em lote, depois
-        // do loop principal (ver migrateCovers).
-        pendingCovers.push({ id: game.id, appid })
-      }
 
-      await admin.from('trophies').upsert(
-        achievements.map((a) => ({
-          game_id: game!.id,
-          external_trophy_id: a.name,
-          name: a.displayName,
-          description: a.description ?? null,
-          icon_url: a.icon ?? null,
-          type: 'achievement',
-          hidden: a.hidden === 1,
-        })),
-        { onConflict: 'game_id,external_trophy_id' },
-      )
+        await admin.from('trophies').insert(
+          achievements.map((a) => {
+            const pt = ptByName.get(a.name)
+            return {
+              game_id: game!.id,
+              external_trophy_id: a.name,
+              name: a.displayName,
+              description: a.description ?? null,
+              name_pt: pt?.displayName ?? a.displayName,
+              description_pt: pt?.description ?? a.description ?? null,
+              icon_url: a.icon ?? null,
+              type: 'achievement',
+              hidden: a.hidden === 1,
+            }
+          }),
+        )
+      } else {
+        if (!game.icon_url?.includes(`/${COVER_BUCKET}/`)) {
+          // Jogo já cacheado antes dessa mudança: migra a capa em lote, depois
+          // do loop principal (ver migrateCovers).
+          pendingCovers.push({ id: game.id, appid })
+        }
+
+        // Jogo sincronizado antes da tradução pt existir: busca e preenche uma vez.
+        const { data: untranslated } = await admin
+          .from('trophies')
+          .select('id, external_trophy_id, name, description')
+          .eq('game_id', game.id)
+          .is('name_pt', null)
+
+        if (untranslated && untranslated.length > 0) {
+          const achievementsPt = await fetchAchievementSchema(appid, steamApiKey, 'brazilian')
+          const ptByName = new Map(achievementsPt.map((a) => [a.name, a]))
+
+          // Upsert em lote (1 chamada) em vez de 1 update por troféu — evita
+          // estourar o tempo limite da function quando há muitos jogos a preencher.
+          // external_trophy_id/name precisam ir junto: são colunas not-null da
+          // tabela e o upsert falha inteiro se faltar alguma no payload.
+          const { error: backfillError } = await admin.from('trophies').upsert(
+            untranslated.map((row) => {
+              const pt = ptByName.get(row.external_trophy_id)
+              return {
+                id: row.id,
+                external_trophy_id: row.external_trophy_id,
+                name: row.name,
+                name_pt: pt?.displayName ?? row.name,
+                description_pt: pt?.description ?? row.description ?? null,
+              }
+            }),
+          )
+          if (backfillError) console.error('backfill pt falhou:', backfillError)
+        }
+      }
 
       const { data: gameTrophies } = await admin
         .from('trophies')
