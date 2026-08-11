@@ -1,0 +1,17 @@
+project_id = "tdlcmqqgtaeyznnxxpne"
+
+# As functions fazem a própria validação do usuário via getUser() a partir
+# do header Authorization enviado pelo cliente. Sem verify_jwt = false aqui,
+# o deploy via CLI volta pro padrão (obrigatório), o que faz o preflight
+# CORS (OPTIONS) do navegador tomar 401 antes da function rodar.
+[functions.steam-connect]
+verify_jwt = false
+
+[functions.steam-sync]
+verify_jwt = false
+
+[functions.psn-connect]
+verify_jwt = false
+
+[functions.psn-sync]
+verify_jwt = false
