@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
         .eq('external_id', npCommunicationId)
         .maybeSingle()
 
-      // Jogo novo: busca e cacheia a lista completa de troféus (definições, não o progresso)
+      // Jogo novo: cria a linha em `games` (definições de troféus vêm a seguir)
       if (!game) {
         const { data: inserted } = await admin
           .from('games')
@@ -85,19 +85,34 @@ Deno.serve(async (req) => {
           .select('id')
           .single()
         game = inserted
+      }
 
+      // Backfill: garante que a lista de troféus está completa mesmo se a
+      // primeira sincronização desse jogo (por qualquer usuário) tiver
+      // falhado no meio do caminho e deixado `trophies` incompleta/vazia —
+      // sem isso, o jogo ficava com troféus faltando pra sempre, já que
+      // antes essa busca só rodava uma vez, na criação do jogo.
+      const { count: trophyCount } = await admin
+        .from('trophies')
+        .select('id', { count: 'exact', head: true })
+        .eq('game_id', game!.id)
+
+      if (!trophyCount) {
         const { trophies } = await getTitleTrophies(authorization, npCommunicationId, 'all')
-        await admin.from('trophies').insert(
-          trophies.map((t: { trophyId: number; trophyName?: string; trophyDetail?: string; trophyIconUrl?: string; trophyType: string; trophyHidden: boolean }) => ({
-            game_id: game!.id,
-            external_trophy_id: String(t.trophyId),
-            name: t.trophyName ?? '???',
-            description: t.trophyDetail ?? null,
-            icon_url: t.trophyIconUrl ?? null,
-            type: t.trophyType,
-            hidden: t.trophyHidden,
-          })),
-        )
+        if (trophies.length > 0) {
+          await admin.from('trophies').upsert(
+            trophies.map((t: { trophyId: number; trophyName?: string; trophyDetail?: string; trophyIconUrl?: string; trophyType: string; trophyHidden: boolean }) => ({
+              game_id: game!.id,
+              external_trophy_id: String(t.trophyId),
+              name: t.trophyName ?? '???',
+              description: t.trophyDetail ?? null,
+              icon_url: t.trophyIconUrl ?? null,
+              type: t.trophyType,
+              hidden: t.trophyHidden,
+            })),
+            { onConflict: 'game_id,external_trophy_id' },
+          )
+        }
       }
 
       // Progresso do usuário nesse jogo
