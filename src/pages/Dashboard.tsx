@@ -4,7 +4,7 @@ import { RefreshCw, Check } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { getGameCoverUrl } from '@/lib/gameArt'
+import { GameCover } from '@/components/GameCover'
 import type { Game, GameWithProgress } from '@/lib/types'
 
 type Filter = 'todos' | 'platinados' | 'pendentes'
@@ -111,14 +111,7 @@ export default function Dashboard() {
               className="overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong"
             >
               <div className="aspect-[460/215] w-full bg-bg">
-                {getGameCoverUrl(game) && (
-                  <img
-                    src={getGameCoverUrl(game)!}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                )}
+                <GameCover game={game} className="h-full w-full object-cover" />
               </div>
 
               <div className="p-4">
