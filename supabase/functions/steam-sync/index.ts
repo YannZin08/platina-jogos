@@ -21,11 +21,12 @@ interface OwnedGame {
   playtime_forever: number
 }
 
-// A Steam não garante a mesma URL de capa pra todo jogo (títulos mais novos
-// às vezes usam outro esquema de assets). Em vez de deixar o navegador do
-// usuário adivinhar e falhar, testamos os candidatos aqui no servidor uma
-// única vez, baixamos o que funcionar e guardamos no Storage do Supabase —
-// depois disso o card sempre carrega, sem depender da Steam responder na hora.
+// A Steam não garante a mesma URL de capa pra todo jogo: títulos lançados
+// depois que a Valve migrou pro novo esquema de assets usam um hash no
+// caminho (shared.akamai.steamstatic.com/store_item_assets/steam/apps/{appid}/{hash}/header.jpg)
+// que não dá pra adivinhar. Testamos os padrões fixos primeiro (mais rápido,
+// sem chamada extra) e só recorremos à API oficial appdetails — que sempre
+// devolve a URL certa, seja qual for o esquema — quando eles falham.
 function coverCandidates(appid: string): string[] {
   return [
     `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
@@ -33,25 +34,54 @@ function coverCandidates(appid: string): string[] {
   ]
 }
 
+async function resolveHeaderImageUrl(appid: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://store.steampowered.com/api/appdetails?appids=${appid}&filters=basic`,
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    return data?.[appid]?.data?.header_image ?? null
+  } catch {
+    return null
+  }
+}
+
+async function downloadAndStoreCover(
+  admin: SupabaseClient,
+  appid: string,
+  url: string,
+): Promise<string | null> {
+  try {
+    const res = await fetch(url)
+    const contentType = res.headers.get('content-type') ?? ''
+    if (!res.ok || !contentType.startsWith('image/')) return null
+
+    const bytes = new Uint8Array(await res.arrayBuffer())
+    const path = `steam/${appid}.jpg`
+    const { error } = await admin.storage
+      .from(COVER_BUCKET)
+      .upload(path, bytes, { contentType, upsert: true })
+    if (error) return null
+
+    return admin.storage.from(COVER_BUCKET).getPublicUrl(path).data.publicUrl
+  } catch {
+    return null
+  }
+}
+
 async function cacheCover(admin: SupabaseClient, appid: string): Promise<string | null> {
   for (const url of coverCandidates(appid)) {
-    try {
-      const res = await fetch(url)
-      const contentType = res.headers.get('content-type') ?? ''
-      if (!res.ok || !contentType.startsWith('image/')) continue
-
-      const bytes = new Uint8Array(await res.arrayBuffer())
-      const path = `steam/${appid}.jpg`
-      const { error } = await admin.storage
-        .from(COVER_BUCKET)
-        .upload(path, bytes, { contentType, upsert: true })
-      if (error) continue
-
-      return admin.storage.from(COVER_BUCKET).getPublicUrl(path).data.publicUrl
-    } catch {
-      continue
-    }
+    const stored = await downloadAndStoreCover(admin, appid, url)
+    if (stored) return stored
   }
+
+  const resolvedUrl = await resolveHeaderImageUrl(appid)
+  if (resolvedUrl) {
+    const stored = await downloadAndStoreCover(admin, appid, resolvedUrl)
+    if (stored) return stored
+  }
+
   return null
 }
 
