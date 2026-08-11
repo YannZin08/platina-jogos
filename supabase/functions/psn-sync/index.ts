@@ -7,8 +7,29 @@ import {
   getUserTitles,
   getTitleTrophies,
   getUserTrophiesEarnedForTitle,
+  getUserPlayedGames,
 } from 'npm:psn-api'
 import { corsHeaders } from '../_shared/cors.ts'
+
+// A API de troféus (getUserTitles) identifica jogos por npCommunicationId,
+// mas tempo jogado só existe na API de "played games", que usa titleId (um
+// id diferente). A Sony não expõe um jeito direto de cruzar os dois, então
+// correlacionamos pelo nome do jogo (normalizado) — é o que outros trackers
+// de troféus fazem também, não é perfeito mas cobre a grande maioria.
+function normalizeGameName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[™®©]/g, '')
+    .trim()
+}
+
+// Converte "PT228H56M33S" (ISO 8601 duration) em minutos.
+function parseIsoDurationToMinutes(duration: string): number {
+  const match = duration.match(/^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/)
+  if (!match) return 0
+  const [, hours, minutes] = match
+  return (Number(hours) || 0) * 60 + (Number(minutes) || 0)
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -60,6 +81,22 @@ Deno.serve(async (req) => {
     }
 
     const { trophyTitles } = await getUserTitles(authorization, 'me')
+
+    // Busca tempo jogado à parte (endpoint diferente do de troféus) e monta
+    // um mapa por nome normalizado pra cruzar com cada trophy title abaixo.
+    // Falha aqui não deve travar a sincronização — tempo jogado é um extra.
+    const playtimeByName = new Map<string, number>()
+    try {
+      const { titles: playedTitles } = await getUserPlayedGames(authorization, 'me', { limit: 200 })
+      for (const played of playedTitles) {
+        playtimeByName.set(
+          normalizeGameName(played.name),
+          parseIsoDurationToMinutes(played.playDuration),
+        )
+      }
+    } catch (err) {
+      console.error('[psn-sync] falha ao buscar tempo jogado:', err)
+    }
 
     for (const title of trophyTitles) {
       const npCommunicationId = title.npCommunicationId
@@ -133,11 +170,16 @@ Deno.serve(async (req) => {
         (t: { trophyType: string; earned: boolean }) => t.trophyType === 'platinum' && t.earned,
       )
 
+      const matchedPlaytime = playtimeByName.get(normalizeGameName(title.trophyTitleName))
+
       await admin.from('user_games').upsert({
         user_id: user.id,
         game_id: game!.id,
         progress_pct: title.progress ?? 0,
         platinated,
+        // Só sobrescreve se achou correspondência agora; não some o valor
+        // salvo antes só porque o nome não bateu nessa sincronização.
+        ...(matchedPlaytime !== undefined ? { playtime_minutes: matchedPlaytime } : {}),
         last_synced_at: new Date().toISOString(),
       })
 
