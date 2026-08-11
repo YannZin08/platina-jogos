@@ -8,9 +8,7 @@ export function AppHeader() {
     <header className="border-b border-border bg-surface/50">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
         <NavLink to="/" className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-md bg-accent">
-            <div className="h-2.5 w-2.5 rotate-45 rounded-[1px] bg-accent-foreground" />
-          </div>
+          <img src="/favicon.svg" alt="" className="h-7 w-7" />
           <span className="font-display text-sm font-semibold text-text">Platina</span>
         </NavLink>
 

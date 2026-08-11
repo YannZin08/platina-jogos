@@ -48,9 +48,7 @@ export default function Login() {
     <div className="flex min-h-screen items-center justify-center bg-bg px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex items-center justify-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent">
-            <div className="h-3.5 w-3.5 rotate-45 rounded-[2px] bg-accent-foreground" />
-          </div>
+          <img src="/favicon.svg" alt="" className="h-9 w-9" />
           <span className="font-display text-xl font-semibold text-text">Platina</span>
         </div>
 

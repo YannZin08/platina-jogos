@@ -82,7 +82,11 @@ export default function GameDetail() {
               trophy.earned ? '' : 'opacity-50'
             }`}
           >
-            <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TIER_COLOR[trophy.type]}`} />
+            {trophy.icon_url && !(trophy.hidden && !trophy.earned) ? (
+              <img src={trophy.icon_url} alt="" className="h-8 w-8 shrink-0 rounded-md bg-bg object-cover" />
+            ) : (
+              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TIER_COLOR[trophy.type]}`} />
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm text-text">{trophy.hidden && !trophy.earned ? '???' : trophy.name}</p>
               {trophy.description && !(trophy.hidden && !trophy.earned) && (
