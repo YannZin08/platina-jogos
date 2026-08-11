@@ -10,11 +10,14 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Settings() {
-  const { user } = useAuth()
+  const { user, resetPassword } = useAuth()
   const { t, locale, setLocale } = useLanguage()
   const [searchParams] = useSearchParams()
   const [npsso, setNpsso] = React.useState('')
   const [username, setUsername] = React.useState<string | null>(null)
+  const [usernameInput, setUsernameInput] = React.useState('')
+  const [savingUsername, setSavingUsername] = React.useState(false)
+  const [sendingPasswordReset, setSendingPasswordReset] = React.useState(false)
   const [psnConnected, setPsnConnected] = React.useState(false)
   const [steamConnected, setSteamConnected] = React.useState(false)
   const [connectingPsn, setConnectingPsn] = React.useState(false)
@@ -32,6 +35,7 @@ export default function Settings() {
       supabase.from('steam_accounts').select('user_id').eq('user_id', user.id).maybeSingle(),
     ])
     setUsername(profile.data?.username ?? null)
+    setUsernameInput(profile.data?.username ?? '')
     setPsnConnected(!!psn.data)
     setSteamConnected(!!steam.data)
   }, [user])
@@ -50,6 +54,38 @@ export default function Settings() {
       setError(t('settings.errorSteamConnect'))
     }
   }, [searchParams, refreshStatus, t])
+
+  async function saveUsername(e: React.FormEvent) {
+    e.preventDefault()
+    if (!user || usernameInput.trim() === '' || usernameInput === username) return
+    setError(null)
+    setSavingUsername(true)
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ username: usernameInput.trim() })
+      .eq('id', user.id)
+    setSavingUsername(false)
+    if (updateError) {
+      setError(
+        updateError.code === '23505'
+          ? t('settings.errorUsernameTaken')
+          : t('settings.errorUsernameSave'),
+      )
+    } else {
+      setUsername(usernameInput.trim())
+      setNotice(t('settings.noticeUsernameSaved'))
+    }
+  }
+
+  async function requestPasswordReset() {
+    if (!user?.email) return
+    setError(null)
+    setSendingPasswordReset(true)
+    const { error: resetError } = await resetPassword(user.email)
+    setSendingPasswordReset(false)
+    if (resetError) setError(t('settings.errorPasswordReset'))
+    else setNotice(t('settings.noticePasswordReset'))
+  }
 
   async function connectPsn(e: React.FormEvent) {
     e.preventDefault()
@@ -156,19 +192,48 @@ export default function Settings() {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Conta</CardTitle>
+            <CardTitle>{t('settings.accountTitle')}</CardTitle>
           </CardHeader>
-          <div className="space-y-1 text-sm">
-            {username && (
-              <p className="text-text">
-                <span className="text-text-secondary">Usuário: </span>
-                {username}
-              </p>
-            )}
-            <p className="text-text">
-              <span className="text-text-secondary">E-mail: </span>
-              {user?.email}
-            </p>
+
+          <form onSubmit={saveUsername} className="mb-4 space-y-1.5">
+            <Label htmlFor="username">{t('settings.usernameLabel')}</Label>
+            <div className="flex gap-2">
+              <Input
+                id="username"
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                required
+              />
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                disabled={savingUsername || usernameInput.trim() === '' || usernameInput === username}
+              >
+                {savingUsername ? t('settings.savingUsername') : t('settings.saveUsername')}
+              </Button>
+            </div>
+          </form>
+
+          <p className="mb-4 text-sm text-text">
+            <span className="text-text-secondary">{t('settings.emailLabel')} </span>
+            {user?.email}
+          </p>
+
+          <div className="space-y-1.5">
+            <Label>{t('settings.passwordLabel')}</Label>
+            <div>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={requestPasswordReset}
+                disabled={sendingPasswordReset}
+              >
+                {sendingPasswordReset ? t('settings.sendingPasswordReset') : t('settings.changePassword')}
+              </Button>
+            </div>
+            <p className="text-xs text-text-secondary">{t('settings.changePasswordDescription')}</p>
           </div>
         </Card>
 
