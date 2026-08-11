@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Avatar } from '@/components/Avatar'
 
 export function AppHeader() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const { t } = useLanguage()
   const [profile, setProfile] = React.useState<{ username: string | null; avatar_url: string | null }>({
     username: null,
@@ -56,12 +56,6 @@ export function AppHeader() {
             <Avatar url={profile.avatar_url} label={profile.username || user?.email || '?'} className="h-5 w-5 text-[10px]" />
             {t('settings.title')}
           </NavLink>
-          <button
-            onClick={signOut}
-            className="ml-1 rounded-lg px-3 py-1.5 text-text-secondary transition-colors hover:text-text"
-          >
-            {t('settings.signOut')}
-          </button>
         </nav>
       </div>
     </header>

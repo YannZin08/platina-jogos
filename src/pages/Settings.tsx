@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, ExternalLink, UserRound, KeyRound, Gamepad2, Globe } from 'lucide-react'
+import { ArrowLeft, Check, ExternalLink, UserRound, KeyRound, Gamepad2, Globe, LogOut } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LANGUAGES, useLanguage } from '@/i18n/LanguageContext'
 import { supabase } from '@/lib/supabase'
@@ -13,7 +13,7 @@ import { Avatar } from '@/components/Avatar'
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 export default function Settings() {
-  const { user, resetPassword } = useAuth()
+  const { user, resetPassword, signOut } = useAuth()
   const { t, locale, setLocale } = useLanguage()
   const [searchParams] = useSearchParams()
   const [npsso, setNpsso] = React.useState('')
@@ -328,6 +328,13 @@ export default function Settings() {
                 </Button>
               </div>
               <CardDescription className="text-xs">{t('settings.changePasswordDescription')}</CardDescription>
+            </div>
+
+            <div className="mt-5 border-t border-border pt-5">
+              <Button type="button" variant="danger" size="sm" onClick={signOut}>
+                <LogOut className="h-4 w-4" />
+                {t('settings.signOut')}
+              </Button>
             </div>
           </Card>
         </section>
