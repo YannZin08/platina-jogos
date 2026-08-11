@@ -50,7 +50,18 @@ Deno.serve(async (req) => {
     const ownedGames: OwnedGame[] = owned?.response?.games ?? []
     const played = ownedGames.filter((g) => g.playtime_forever > 0)
 
+    // Diagnóstico: loga o tamanho de cada etapa pra achar onde a lista zera
+    // (perfil ainda privado pra API mesmo com "detalhes do jogo" público,
+    // API key inválida, biblioteca sem jogos jogados, jogos sem conquistas etc.)
+    console.log(
+      `[steam-sync] steamId=${steamId} httpStatus=${ownedRes.status} gameCount=${owned?.response?.game_count ?? 'n/a'} ownedGames=${ownedGames.length} withPlaytime=${played.length}`,
+    )
+    if (ownedGames.length === 0) {
+      console.log(`[steam-sync] resposta bruta da GetOwnedGames: ${JSON.stringify(owned)}`)
+    }
+
     let syncedCount = 0
+    let noAchievementsCount = 0
 
     for (const ownedGame of played) {
       const appid = String(ownedGame.appid)
@@ -70,7 +81,11 @@ Deno.serve(async (req) => {
         const achievements: { name: string; displayName: string; description?: string; icon: string; hidden: number }[] =
           schema?.game?.availableGameStats?.achievements ?? []
 
-        if (achievements.length === 0) continue // jogo sem conquistas, não tem o que rastrear
+        if (achievements.length === 0) {
+          // jogo sem conquistas, não tem o que rastrear
+          noAchievementsCount++
+          continue
+        }
 
         const { data: inserted } = await admin
           .from('games')
@@ -143,9 +158,22 @@ Deno.serve(async (req) => {
       .update({ last_synced_at: new Date().toISOString() })
       .eq('user_id', user.id)
 
-    return new Response(JSON.stringify({ ok: true, synced: syncedCount }), {
-      headers: { 'Content-Type': 'application/json' },
-    })
+    console.log(
+      `[steam-sync] resultado: synced=${syncedCount} semConquistas=${noAchievementsCount} ownedGames=${ownedGames.length} withPlaytime=${played.length}`,
+    )
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        synced: syncedCount,
+        diagnostics: {
+          ownedGames: ownedGames.length,
+          withPlaytime: played.length,
+          withoutAchievements: noAchievementsCount,
+        },
+      }),
+      { headers: { 'Content-Type': 'application/json' } },
+    )
   } catch (err) {
     console.error(err)
     return new Response(JSON.stringify({ error: 'Falha ao sincronizar com a Steam.' }), { status: 500 })

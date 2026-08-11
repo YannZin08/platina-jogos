@@ -12,6 +12,7 @@ export default function Settings() {
   const { user, signOut } = useAuth()
   const [searchParams] = useSearchParams()
   const [npsso, setNpsso] = React.useState('')
+  const [username, setUsername] = React.useState<string | null>(null)
   const [psnConnected, setPsnConnected] = React.useState(false)
   const [steamConnected, setSteamConnected] = React.useState(false)
   const [connectingPsn, setConnectingPsn] = React.useState(false)
@@ -23,10 +24,12 @@ export default function Settings() {
 
   const refreshStatus = React.useCallback(async () => {
     if (!user) return
-    const [psn, steam] = await Promise.all([
+    const [profile, psn, steam] = await Promise.all([
+      supabase.from('profiles').select('username').eq('id', user.id).maybeSingle(),
       supabase.from('psn_accounts').select('user_id').eq('user_id', user.id).maybeSingle(),
       supabase.from('steam_accounts').select('user_id').eq('user_id', user.id).maybeSingle(),
     ])
+    setUsername(profile.data?.username ?? null)
     setPsnConnected(!!psn.data)
     setSteamConnected(!!steam.data)
   }, [user])
@@ -50,48 +53,82 @@ export default function Settings() {
     e.preventDefault()
     setError(null)
     setConnectingPsn(true)
-    const { error: fnError } = await supabase.functions.invoke('psn-connect', {
-      body: { npsso },
-    })
-    setConnectingPsn(false)
-    if (fnError) {
-      setError('Não foi possível conectar. Confira o NPSSO e tente de novo.')
-    } else {
-      setPsnConnected(true)
-      setNpsso('')
+    try {
+      const { error: fnError } = await supabase.functions.invoke('psn-connect', {
+        body: { npsso },
+      })
+      if (fnError) {
+        setError('Não foi possível conectar. Confira o NPSSO e tente de novo.')
+      } else {
+        setPsnConnected(true)
+        setNpsso('')
+      }
+    } catch {
+      setError('Não foi possível conectar. Verifique sua conexão e tente de novo.')
+    } finally {
+      setConnectingPsn(false)
     }
   }
 
   async function connectSteam() {
     setError(null)
     setConnectingSteam(true)
-    const { data, error: fnError } = await supabase.functions.invoke<{ redirectUrl: string }>(
-      'steam-connect',
-    )
-    setConnectingSteam(false)
-    if (fnError || !data?.redirectUrl) {
-      setError('Não foi possível iniciar o login da Steam.')
-      return
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke<{ redirectUrl: string }>(
+        'steam-connect',
+      )
+      if (fnError || !data?.redirectUrl) {
+        setError('Não foi possível iniciar o login da Steam.')
+        return
+      }
+      window.location.href = data.redirectUrl
+    } catch {
+      setError('Não foi possível iniciar o login da Steam. Verifique sua conexão e tente de novo.')
+    } finally {
+      setConnectingSteam(false)
     }
-    window.location.href = data.redirectUrl
   }
 
   async function syncPsn() {
     setSyncingPsn(true)
     setError(null)
-    const { error: fnError } = await supabase.functions.invoke('psn-sync')
-    setSyncingPsn(false)
-    if (fnError) setError('Falha ao sincronizar com a PSN.')
-    else setNotice('Troféus da PSN sincronizados.')
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke<{ synced: number }>('psn-sync')
+      if (fnError) setError('Falha ao sincronizar com a PSN.')
+      else if (!data?.synced) setNotice('Sincronizado, mas nenhum jogo foi encontrado na sua conta PSN.')
+      else setNotice('Troféus da PSN sincronizados.')
+    } catch {
+      setError('Falha ao sincronizar com a PSN. Verifique sua conexão e tente de novo.')
+    } finally {
+      setSyncingPsn(false)
+    }
   }
 
   async function syncSteam() {
     setSyncingSteam(true)
     setError(null)
-    const { error: fnError } = await supabase.functions.invoke('steam-sync')
-    setSyncingSteam(false)
-    if (fnError) setError('Falha ao sincronizar com a Steam.')
-    else setNotice('Conquistas da Steam sincronizadas.')
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke<{
+        synced: number
+        diagnostics?: { ownedGames: number; withPlaytime: number; withoutAchievements: number }
+      }>('steam-sync')
+      if (fnError) setError('Falha ao sincronizar com a Steam.')
+      else if (!data?.synced) {
+        const d = data?.diagnostics
+        const detail = d
+          ? d.ownedGames === 0
+            ? 'a Steam não retornou nenhum jogo da conta (perfil ainda não está acessível pra API, ou a conta não tem jogos).'
+            : d.withPlaytime === 0
+              ? `a conta tem ${d.ownedGames} jogo(s), mas nenhum com tempo de jogo registrado.`
+              : `${d.withPlaytime} jogo(s) com tempo de jogo, mas nenhum tinha conquistas cadastradas na Steam.`
+          : ''
+        setNotice(`Sincronizado, mas nenhum jogo com conquistas foi encontrado. ${detail}`.trim())
+      } else setNotice('Conquistas da Steam sincronizadas.')
+    } catch {
+      setError('Falha ao sincronizar com a Steam. Verifique sua conexão e tente de novo.')
+    } finally {
+      setSyncingSteam(false)
+    }
   }
 
   return (
@@ -110,6 +147,24 @@ export default function Settings() {
       )}
 
       <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Conta</CardTitle>
+          </CardHeader>
+          <div className="space-y-1 text-sm">
+            {username && (
+              <p className="text-text">
+                <span className="text-text-secondary">Usuário: </span>
+                {username}
+              </p>
+            )}
+            <p className="text-text">
+              <span className="text-text-secondary">E-mail: </span>
+              {user?.email}
+            </p>
+          </div>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>PlayStation Network</CardTitle>
