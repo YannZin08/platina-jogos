@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
+import { getGameCoverUrl } from '@/lib/gameArt'
 import type { Game, Trophy, TrophyType } from '@/lib/types'
 
 type TrophyRow = Trophy & { earned: boolean; earned_at: string | null }
@@ -67,12 +68,14 @@ export default function GameDetail() {
         Meus jogos
       </Link>
 
-      <div className="mb-6 flex items-center gap-3">
-        {game?.icon_url && (
-          <img src={game.icon_url} alt="" className="h-12 w-12 rounded-lg bg-surface object-cover" />
-        )}
-        <h1 className="font-display text-xl font-medium text-text">{game?.name ?? 'Jogo'}</h1>
-      </div>
+      {game && getGameCoverUrl(game) && (
+        <img
+          src={getGameCoverUrl(game)!}
+          alt=""
+          className="mb-4 aspect-[460/215] w-full rounded-xl bg-surface object-cover"
+        />
+      )}
+      <h1 className="font-display mb-6 text-xl font-medium text-text">{game?.name ?? 'Jogo'}</h1>
 
       <div className="space-y-2">
         {trophies.map((trophy) => (

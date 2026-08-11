@@ -73,20 +73,24 @@ Deno.serve(async (req) => {
         .eq('external_id', appid)
         .maybeSingle()
 
+      // Sempre busca o schema em português (Steam localiza nome/descrição das
+      // conquistas por idioma; sem o "l=brazilian" vem em inglês por padrão).
+      // Roda pra jogos já cacheados também, pra corrigir/atualizar a tradução
+      // sem precisar de uma migração separada.
+      const schemaRes = await fetch(
+        `${STEAM_API}/ISteamUserStats/GetSchemaForGame/v2/?key=${steamApiKey}&appid=${appid}&l=brazilian`,
+      )
+      const schema = await schemaRes.json()
+      const achievements: { name: string; displayName: string; description?: string; icon: string; hidden: number }[] =
+        schema?.game?.availableGameStats?.achievements ?? []
+
+      if (achievements.length === 0) {
+        // jogo sem conquistas, não tem o que rastrear
+        noAchievementsCount++
+        continue
+      }
+
       if (!game) {
-        const schemaRes = await fetch(
-          `${STEAM_API}/ISteamUserStats/GetSchemaForGame/v2/?key=${steamApiKey}&appid=${appid}`,
-        )
-        const schema = await schemaRes.json()
-        const achievements: { name: string; displayName: string; description?: string; icon: string; hidden: number }[] =
-          schema?.game?.availableGameStats?.achievements ?? []
-
-        if (achievements.length === 0) {
-          // jogo sem conquistas, não tem o que rastrear
-          noAchievementsCount++
-          continue
-        }
-
         const { data: inserted } = await admin
           .from('games')
           .insert({
@@ -101,19 +105,20 @@ Deno.serve(async (req) => {
           .select('id')
           .single()
         game = inserted
-
-        await admin.from('trophies').insert(
-          achievements.map((a) => ({
-            game_id: game!.id,
-            external_trophy_id: a.name,
-            name: a.displayName,
-            description: a.description ?? null,
-            icon_url: a.icon ?? null,
-            type: 'achievement',
-            hidden: a.hidden === 1,
-          })),
-        )
       }
+
+      await admin.from('trophies').upsert(
+        achievements.map((a) => ({
+          game_id: game!.id,
+          external_trophy_id: a.name,
+          name: a.displayName,
+          description: a.description ?? null,
+          icon_url: a.icon ?? null,
+          type: 'achievement',
+          hidden: a.hidden === 1,
+        })),
+        { onConflict: 'game_id,external_trophy_id' },
+      )
 
       const { data: gameTrophies } = await admin
         .from('trophies')
@@ -126,10 +131,10 @@ Deno.serve(async (req) => {
         `${STEAM_API}/ISteamUserStats/GetPlayerAchievements/v1/?key=${steamApiKey}&steamid=${steamId}&appid=${appid}`,
       )
       const achievedData = await achievedRes.json()
-      const achievements: { apiname: string; achieved: number; unlocktime: number }[] =
+      const playerAchievements: { apiname: string; achieved: number; unlocktime: number }[] =
         achievedData?.playerstats?.achievements ?? []
-      const achievedMap = new Map(achievements.map((a) => [a.apiname, a]))
-      const earnedCount = achievements.filter((a) => a.achieved === 1).length
+      const achievedMap = new Map(playerAchievements.map((a) => [a.apiname, a]))
+      const earnedCount = playerAchievements.filter((a) => a.achieved === 1).length
       const progressPct = Math.round((earnedCount / gameTrophies.length) * 100)
 
       await admin.from('user_games').upsert({

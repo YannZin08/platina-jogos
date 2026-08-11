@@ -4,6 +4,7 @@ import { RefreshCw, Check } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
+import { getGameCoverUrl } from '@/lib/gameArt'
 import type { Game, GameWithProgress } from '@/lib/types'
 
 type Filter = 'todos' | 'platinados' | 'pendentes'
@@ -107,43 +108,46 @@ export default function Dashboard() {
             <Link
               key={game.id}
               to={`/games/${game.id}`}
-              className="rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong"
+              className="overflow-hidden rounded-xl border border-border bg-surface transition-colors hover:border-border-strong"
             >
-              <div className="mb-2.5 flex items-center gap-3">
-                {game.icon_url ? (
+              <div className="aspect-[460/215] w-full bg-bg">
+                {getGameCoverUrl(game) && (
                   <img
-                    src={game.icon_url}
+                    src={getGameCoverUrl(game)!}
                     alt=""
-                    className="h-10 w-10 shrink-0 rounded-lg bg-bg object-cover"
+                    loading="lazy"
+                    className="h-full w-full object-cover"
                   />
-                ) : (
-                  <div className="h-10 w-10 shrink-0 rounded-lg bg-bg" />
                 )}
-                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+              </div>
+
+              <div className="p-4">
+                <div className="mb-2.5 flex items-center justify-between gap-2">
                   <span className="truncate text-sm font-medium text-text">{game.name}</span>
                   <span className="shrink-0 rounded-md bg-bg px-2 py-0.5 text-[11px] text-text-secondary">
                     {game.platform === 'psn' ? 'PSN' : 'Steam'}
                   </span>
                 </div>
-              </div>
 
-              <div className="mb-2.5 h-1.5 overflow-hidden rounded-full bg-bg">
-                <div
-                  className={`h-full rounded-full ${game.platinated ? 'bg-success' : 'bg-accent'}`}
-                  style={{ width: `${Math.round(game.progress_pct)}%` }}
-                />
-              </div>
+                <div className="mb-2.5 h-1.5 overflow-hidden rounded-full bg-bg">
+                  <div
+                    className={`h-full rounded-full ${game.platinated ? 'bg-success' : 'bg-accent'}`}
+                    style={{ width: `${Math.round(game.progress_pct)}%` }}
+                  />
+                </div>
 
-              {game.platinated ? (
-                <div className="flex items-center gap-1 text-xs font-medium text-success">
-                  <Check className="h-3.5 w-3.5" />
-                  {game.platform === 'psn' ? 'Platinado' : '100% completo'}
-                </div>
-              ) : (
-                <div className="text-xs text-text-secondary">
-                  {Math.round(game.progress_pct)}% {game.platform === 'psn' ? 'dos troféus' : 'das conquistas'}
-                </div>
-              )}
+                {game.platinated ? (
+                  <div className="flex items-center gap-1 text-xs font-medium text-success">
+                    <Check className="h-3.5 w-3.5" />
+                    {game.platform === 'psn' ? 'Platinado' : '100% completo'}
+                  </div>
+                ) : (
+                  <div className="text-xs text-text-secondary">
+                    {Math.round(game.progress_pct)}%{' '}
+                    {game.platform === 'psn' ? 'dos troféus' : 'das conquistas'}
+                  </div>
+                )}
+              </div>
             </Link>
           ))}
         </div>
