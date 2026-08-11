@@ -66,7 +66,10 @@ export default function Dashboard() {
     setSyncing(true)
     // Conta não conectada ou function fora do ar não deve travar a tela;
     // é uma sincronização silenciosa em segundo plano.
-    await Promise.allSettled([supabase.functions.invoke('steam-sync')])
+    await Promise.allSettled([
+      supabase.functions.invoke('steam-sync'),
+      supabase.functions.invoke('psn-sync'),
+    ])
     await loadGames(false)
     setSyncing(false)
   }, [loadGames])
