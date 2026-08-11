@@ -56,6 +56,7 @@ export const pt = {
   'settings.psnTitle': 'PlayStation Network',
   'settings.psnDescriptionPrefix': 'Logue em',
   'settings.psnDescriptionSuffix': 'e cole abaixo o código NPSSO da sua conta.',
+  'settings.getNpsso': 'Pegar código NPSSO',
   'settings.npssoLabel': 'Código NPSSO',
   'settings.npssoPlaceholder': '64 caracteres',
   'settings.connectPsn': 'Conectar conta PSN',

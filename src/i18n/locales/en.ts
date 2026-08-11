@@ -57,6 +57,7 @@ export const en: Record<keyof typeof pt, string> = {
   'settings.psnTitle': 'PlayStation Network',
   'settings.psnDescriptionPrefix': 'Sign in at',
   'settings.psnDescriptionSuffix': 'and paste your account NPSSO code below.',
+  'settings.getNpsso': 'Get NPSSO code',
   'settings.npssoLabel': 'NPSSO code',
   'settings.npssoPlaceholder': '64 characters',
   'settings.connectPsn': 'Connect PSN account',

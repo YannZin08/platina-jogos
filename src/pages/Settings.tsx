@@ -196,6 +196,14 @@ export default function Settings() {
                 </a>{' '}
                 {t('settings.psnDescriptionSuffix')}
               </p>
+              <a
+                href="https://ca.account.sony.com/api/v1/ssocookie"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text hover:bg-surface-hover"
+              >
+                {t('settings.getNpsso')} <ExternalLink className="h-3.5 w-3.5" />
+              </a>
               <div className="space-y-1.5">
                 <Label htmlFor="npsso">{t('settings.npssoLabel')}</Label>
                 <Input
