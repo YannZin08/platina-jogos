@@ -22,6 +22,7 @@ export const pt = {
   'dashboard.filterAll': 'Todos',
   'dashboard.filterPlatinated': 'Platinados',
   'dashboard.filterPending': 'Pendentes',
+  'dashboard.platformAll': 'Todas as plataformas',
   'dashboard.emptyTitle': 'Nenhum jogo ainda',
   'dashboard.emptyDescription':
     'Conecte sua conta PSN ou Steam nas configurações para importar seus troféus.',

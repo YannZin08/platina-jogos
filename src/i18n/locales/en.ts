@@ -24,6 +24,7 @@ export const en: Record<keyof typeof pt, string> = {
   'dashboard.filterAll': 'All',
   'dashboard.filterPlatinated': 'Platinated',
   'dashboard.filterPending': 'Pending',
+  'dashboard.platformAll': 'All platforms',
   'dashboard.emptyTitle': 'No games yet',
   'dashboard.emptyDescription': 'Connect your PSN or Steam account in settings to import your trophies.',
   'dashboard.goToSettings': 'Go to settings',

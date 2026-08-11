@@ -11,6 +11,7 @@ import { formatPlaytime } from '@/lib/utils'
 import type { Game, GameWithProgress } from '@/lib/types'
 
 type Filter = 'todos' | 'platinados' | 'pendentes'
+type PlatformFilter = 'todas' | 'psn' | 'steam'
 type Sort = 'recent' | 'progress' | null
 
 export default function Dashboard() {
@@ -20,6 +21,7 @@ export default function Dashboard() {
   const [loading, setLoading] = React.useState(true)
   const [syncing, setSyncing] = React.useState(false)
   const [filter, setFilter] = React.useState<Filter>('todos')
+  const [platformFilter, setPlatformFilter] = React.useState<PlatformFilter>('todas')
   const [sort, setSort] = React.useState<Sort>(null)
   const [search, setSearch] = React.useState('')
 
@@ -86,6 +88,8 @@ export default function Dashboard() {
   }
 
   const platinatedCount = games.filter((g) => g.platinated).length
+  const hasPsn = games.some((g) => g.platform === 'psn')
+  const hasSteam = games.some((g) => g.platform === 'steam')
 
   const visible = games
     .filter((g) => {
@@ -93,6 +97,7 @@ export default function Dashboard() {
       if (filter === 'pendentes') return !g.platinated
       return true
     })
+    .filter((g) => platformFilter === 'todas' || g.platform === platformFilter)
     .filter((g) => g.name.toLowerCase().includes(search.trim().toLowerCase()))
     .sort((a, b) => {
       if (a.favorite !== b.favorite) return a.favorite ? -1 : 1
@@ -111,6 +116,12 @@ export default function Dashboard() {
     todos: t('dashboard.filterAll'),
     platinados: t('dashboard.filterPlatinated'),
     pendentes: t('dashboard.filterPending'),
+  }
+
+  const PLATFORM_LABEL: Record<PlatformFilter, string> = {
+    todas: t('dashboard.platformAll'),
+    psn: 'PSN',
+    steam: 'Steam',
   }
 
   const SORT_LABEL: Record<Exclude<Sort, null>, string> = {
@@ -170,20 +181,40 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="mb-6 flex gap-2">
-            {(['todos', 'platinados', 'pendentes'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${
-                  filter === f
-                    ? 'bg-accent/15 text-accent'
-                    : 'text-text-secondary hover:bg-surface'
-                }`}
-              >
-                {FILTER_LABEL[f]}
-              </button>
-            ))}
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex gap-2">
+              {(['todos', 'platinados', 'pendentes'] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilter(f)}
+                  className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${
+                    filter === f
+                      ? 'bg-accent/15 text-accent'
+                      : 'text-text-secondary hover:bg-surface'
+                  }`}
+                >
+                  {FILTER_LABEL[f]}
+                </button>
+              ))}
+            </div>
+
+            {hasPsn && hasSteam && (
+              <div className="flex gap-2">
+                {(['todas', 'psn', 'steam'] as const).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPlatformFilter(p)}
+                    className={`rounded-lg px-3.5 py-1.5 text-sm transition-colors ${
+                      platformFilter === p
+                        ? 'bg-accent/15 text-accent'
+                        : 'text-text-secondary hover:bg-surface'
+                    }`}
+                  >
+                    {PLATFORM_LABEL[p]}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
