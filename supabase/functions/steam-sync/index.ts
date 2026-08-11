@@ -55,6 +55,28 @@ async function cacheCover(admin: SupabaseClient, appid: string): Promise<string 
   return null
 }
 
+// Migra a capa de todos os jogos pendentes de uma vez, em paralelo (com um
+// teto de conexões simultâneas pra não sobrecarregar o CDN da Steam), em vez
+// de um por sincronização — assim uma única sincronização já deixa a
+// biblioteca inteira com capa em boa qualidade.
+async function migrateCovers(
+  admin: SupabaseClient,
+  pending: { id: string; appid: string }[],
+  concurrency = 6,
+) {
+  for (let i = 0; i < pending.length; i += concurrency) {
+    const batch = pending.slice(i, i + concurrency)
+    await Promise.all(
+      batch.map(async ({ id, appid }) => {
+        const cachedCover = await cacheCover(admin, appid)
+        if (cachedCover) {
+          await admin.from('games').update({ icon_url: cachedCover }).eq('id', id)
+        }
+      }),
+    )
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -119,11 +141,7 @@ Deno.serve(async (req) => {
 
     let syncedCount = 0
     let noAchievementsCount = 0
-    // Baixar+cachear a capa de todo mundo numa unica execucao pode estourar
-    // o tempo limite da function quando ha muitos jogos ainda nao migrados.
-    // Limitamos quantas migracoes de capa rodam por sincronizacao; o resto
-    // completa nas proximas.
-    let coverBackfillBudget = 8
+    const pendingCovers: { id: string; appid: string }[] = []
 
     for (const ownedGame of played) {
       const appid = String(ownedGame.appid)
@@ -170,14 +188,10 @@ Deno.serve(async (req) => {
           .select('id, icon_url')
           .single()
         game = inserted
-      } else if (!game.icon_url?.includes(`/${COVER_BUCKET}/`) && coverBackfillBudget > 0) {
-        // Jogo já cacheado antes dessa mudança: tenta migrar a capa uma vez.
-        coverBackfillBudget--
-        const cachedCover = await cacheCover(admin, appid)
-        if (cachedCover) {
-          await admin.from('games').update({ icon_url: cachedCover }).eq('id', game.id)
-          game.icon_url = cachedCover
-        }
+      } else if (!game.icon_url?.includes(`/${COVER_BUCKET}/`)) {
+        // Jogo já cacheado antes dessa mudança: migra a capa em lote, depois
+        // do loop principal (ver migrateCovers).
+        pendingCovers.push({ id: game.id, appid })
       }
 
       await admin.from('trophies').upsert(
@@ -236,8 +250,12 @@ Deno.serve(async (req) => {
       .update({ last_synced_at: new Date().toISOString() })
       .eq('user_id', user.id)
 
+    if (pendingCovers.length > 0) {
+      await migrateCovers(admin, pendingCovers)
+    }
+
     console.log(
-      `[steam-sync] resultado: synced=${syncedCount} semConquistas=${noAchievementsCount} ownedGames=${ownedGames.length} withPlaytime=${played.length}`,
+      `[steam-sync] resultado: synced=${syncedCount} semConquistas=${noAchievementsCount} ownedGames=${ownedGames.length} withPlaytime=${played.length} capasMigradas=${pendingCovers.length}`,
     )
 
     return new Response(
