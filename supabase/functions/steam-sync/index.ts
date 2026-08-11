@@ -58,6 +58,11 @@ async function downloadAndStoreCover(
     if (!res.ok || !contentType.startsWith('image/')) return null
 
     const bytes = new Uint8Array(await res.arrayBuffer())
+    // A Steam serve um placeholder cinza minúsculo (~1-2KB) pra jogos sem
+    // arte de loja definitiva ainda (ex: pré-lançamento). Um header.jpg de
+    // verdade nunca é tão pequeno, então tratamos isso como "não achou".
+    if (bytes.length < 8000) return null
+
     const path = `steam/${appid}.jpg`
     const { error } = await admin.storage
       .from(COVER_BUCKET)
