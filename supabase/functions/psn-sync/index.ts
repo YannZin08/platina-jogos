@@ -135,20 +135,69 @@ Deno.serve(async (req) => {
         .eq('game_id', game!.id)
 
       if (!trophyCount) {
-        const { trophies } = await getTitleTrophies(authorization, npCommunicationId, 'all')
+        const [{ trophies }, { trophies: trophiesPt }] = await Promise.all([
+          getTitleTrophies(authorization, npCommunicationId, 'all'),
+          getTitleTrophies(authorization, npCommunicationId, 'all', {
+            headerOverrides: { 'Accept-Language': 'pt-BR' },
+          }),
+        ])
+        const ptById = new Map(trophiesPt.map((t: { trophyId: number }) => [t.trophyId, t]))
+
         if (trophies.length > 0) {
           await admin.from('trophies').upsert(
-            trophies.map((t: { trophyId: number; trophyName?: string; trophyDetail?: string; trophyIconUrl?: string; trophyType: string; trophyHidden: boolean }) => ({
-              game_id: game!.id,
-              external_trophy_id: String(t.trophyId),
-              name: t.trophyName ?? '???',
-              description: t.trophyDetail ?? null,
-              icon_url: t.trophyIconUrl ?? null,
-              type: t.trophyType,
-              hidden: t.trophyHidden,
-            })),
+            trophies.map((t: { trophyId: number; trophyName?: string; trophyDetail?: string; trophyIconUrl?: string; trophyType: string; trophyHidden: boolean }) => {
+              const pt = ptById.get(t.trophyId) as
+                | { trophyName?: string; trophyDetail?: string }
+                | undefined
+              return {
+                game_id: game!.id,
+                external_trophy_id: String(t.trophyId),
+                name: t.trophyName ?? '???',
+                description: t.trophyDetail ?? null,
+                name_pt: pt?.trophyName ?? t.trophyName ?? '???',
+                description_pt: pt?.trophyDetail ?? t.trophyDetail ?? null,
+                icon_url: t.trophyIconUrl ?? null,
+                type: t.trophyType,
+                hidden: t.trophyHidden,
+              }
+            }),
             { onConflict: 'game_id,external_trophy_id' },
           )
+        }
+      } else {
+        // Jogo sincronizado antes da tradução pt existir: busca e preenche uma vez.
+        const { data: untranslated } = await admin
+          .from('trophies')
+          .select('id, external_trophy_id, name, description')
+          .eq('game_id', game!.id)
+          .is('name_pt', null)
+
+        if (untranslated && untranslated.length > 0) {
+          const { trophies: trophiesPt } = await getTitleTrophies(authorization, npCommunicationId, 'all', {
+            headerOverrides: { 'Accept-Language': 'pt-BR' },
+          })
+          const ptById = new Map(
+            trophiesPt.map((t: { trophyId: number; trophyName?: string; trophyDetail?: string }) => [
+              String(t.trophyId),
+              t,
+            ]),
+          )
+
+          // Upsert em lote (1 chamada) em vez de 1 update por troféu — evita
+          // estourar o tempo limite da function quando há muitos jogos a preencher.
+          const { error: backfillError } = await admin.from('trophies').upsert(
+            untranslated.map((row) => {
+              const pt = ptById.get(row.external_trophy_id)
+              return {
+                id: row.id,
+                external_trophy_id: row.external_trophy_id,
+                name: row.name,
+                name_pt: pt?.trophyName ?? row.name,
+                description_pt: pt?.trophyDetail ?? row.description ?? null,
+              }
+            }),
+          )
+          if (backfillError) console.error('[psn-sync] backfill pt falhou:', backfillError)
         }
       }
 
