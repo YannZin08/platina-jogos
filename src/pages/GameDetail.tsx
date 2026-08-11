@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useLanguage } from '@/i18n/LanguageContext'
 import { supabase } from '@/lib/supabase'
 import { GameCover } from '@/components/GameCover'
+import { formatPlaytime } from '@/lib/utils'
 import type { Game, Trophy, TrophyType } from '@/lib/types'
 
 type TrophyRow = Trophy & { earned: boolean; earned_at: string | null }
@@ -24,6 +25,7 @@ export default function GameDetail() {
   const { t, locale } = useLanguage()
   const [game, setGame] = React.useState<Game | null>(null)
   const [trophies, setTrophies] = React.useState<TrophyRow[]>([])
+  const [playtimeMinutes, setPlaytimeMinutes] = React.useState<number | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [filter, setFilter] = React.useState<Filter>('todas')
 
@@ -33,15 +35,22 @@ export default function GameDetail() {
     const userId = user.id
 
     async function load() {
-      const [{ data: gameData }, { data: trophyData }, { data: earnedData }] = await Promise.all([
-        supabase.from('games').select('*').eq('id', gameId).single(),
-        supabase.from('trophies').select('*').eq('game_id', gameId),
-        supabase
-          .from('user_trophies')
-          .select('trophy_id, earned, earned_at, trophies!inner(game_id)')
-          .eq('user_id', userId)
-          .eq('trophies.game_id', gameId),
-      ])
+      const [{ data: gameData }, { data: trophyData }, { data: earnedData }, { data: userGameData }] =
+        await Promise.all([
+          supabase.from('games').select('*').eq('id', gameId).single(),
+          supabase.from('trophies').select('*').eq('game_id', gameId),
+          supabase
+            .from('user_trophies')
+            .select('trophy_id, earned, earned_at, trophies!inner(game_id)')
+            .eq('user_id', userId)
+            .eq('trophies.game_id', gameId),
+          supabase
+            .from('user_games')
+            .select('playtime_minutes')
+            .eq('user_id', userId)
+            .eq('game_id', gameId)
+            .maybeSingle(),
+        ])
 
       const trophies = (trophyData ?? []) as unknown as Trophy[]
       const earned = (earnedData ?? []) as unknown as { trophy_id: string; earned: boolean; earned_at: string | null }[]
@@ -55,6 +64,7 @@ export default function GameDetail() {
 
       setGame(gameData as unknown as Game)
       setTrophies(merged)
+      setPlaytimeMinutes(userGameData?.playtime_minutes ?? null)
       setLoading(false)
     }
 
@@ -106,6 +116,9 @@ export default function GameDetail() {
               earned: earnedCount,
               missing: trophies.length - earnedCount,
             })}
+            {playtimeMinutes != null && playtimeMinutes > 0 && (
+              <> · {t('gameDetail.playtime', { duration: formatPlaytime(playtimeMinutes) })}</>
+            )}
           </p>
 
           <div className="mb-6 flex gap-2">

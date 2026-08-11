@@ -309,6 +309,7 @@ Deno.serve(async (req) => {
         game_id: game!.id,
         progress_pct: progressPct,
         platinated: gameTrophies.length > 0 && earnedCount === gameTrophies.length,
+        playtime_minutes: ownedGame.playtime_forever,
         last_synced_at: new Date().toISOString(),
       })
 

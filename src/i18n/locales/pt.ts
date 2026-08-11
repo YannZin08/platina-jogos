@@ -36,10 +36,12 @@ export const pt = {
   'dashboard.favoriteAdd': 'Favoritar',
   'dashboard.favoriteRemove': 'Remover dos favoritos',
   'dashboard.noResults': 'Nenhum jogo encontrado para "{{query}}"',
+  'dashboard.playtime': '{{duration}} jogadas',
 
   'gameDetail.backLink': 'Meus jogos',
   'gameDetail.fallbackTitle': 'Jogo',
   'gameDetail.summary': 'Total de {{total}} conquistas, {{earned}} concluídas e {{missing}} não concluídas',
+  'gameDetail.playtime': '{{duration}} jogadas',
   'gameDetail.filterAll': 'Todas',
   'gameDetail.filterDone': 'Concluídas',
   'gameDetail.filterPending': 'Não concluídas',

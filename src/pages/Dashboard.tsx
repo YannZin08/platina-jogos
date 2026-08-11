@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { GameCover } from '@/components/GameCover'
+import { formatPlaytime } from '@/lib/utils'
 import type { Game, GameWithProgress } from '@/lib/types'
 
 type Filter = 'todos' | 'platinados' | 'pendentes'
@@ -29,13 +30,14 @@ export default function Dashboard() {
 
       const { data } = await supabase
         .from('user_games')
-        .select('progress_pct, platinated, favorite, last_synced_at, games(*)')
+        .select('progress_pct, platinated, favorite, playtime_minutes, last_synced_at, games(*)')
         .eq('user_id', user.id)
 
       type Row = {
         progress_pct: number
         platinated: boolean
         favorite: boolean
+        playtime_minutes: number | null
         last_synced_at: string | null
         games: Game | null
       }
@@ -48,6 +50,7 @@ export default function Dashboard() {
           progress_pct: row.progress_pct,
           platinated: row.platinated,
           favorite: row.favorite,
+          playtime_minutes: row.playtime_minutes,
           last_synced_at: row.last_synced_at,
         }))
 
@@ -238,20 +241,28 @@ export default function Dashboard() {
                   />
                 </div>
 
-                {game.platinated ? (
-                  <div className="flex items-center gap-1 text-xs font-medium text-success">
-                    <Check className="h-3.5 w-3.5" />
-                    {game.platform === 'psn'
-                      ? t('dashboard.platinatedBadgePsn')
-                      : t('dashboard.platinatedBadgeSteam')}
-                  </div>
-                ) : (
-                  <div className="text-xs text-text-secondary">
-                    {game.platform === 'psn'
-                      ? t('dashboard.progressPsn', { pct: Math.round(game.progress_pct) })
-                      : t('dashboard.progressSteam', { pct: Math.round(game.progress_pct) })}
-                  </div>
-                )}
+                <div className="flex items-center justify-between gap-2">
+                  {game.platinated ? (
+                    <div className="flex items-center gap-1 text-xs font-medium text-success">
+                      <Check className="h-3.5 w-3.5" />
+                      {game.platform === 'psn'
+                        ? t('dashboard.platinatedBadgePsn')
+                        : t('dashboard.platinatedBadgeSteam')}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-text-secondary">
+                      {game.platform === 'psn'
+                        ? t('dashboard.progressPsn', { pct: Math.round(game.progress_pct) })
+                        : t('dashboard.progressSteam', { pct: Math.round(game.progress_pct) })}
+                    </div>
+                  )}
+
+                  {game.playtime_minutes != null && game.playtime_minutes > 0 && (
+                    <span className="shrink-0 text-xs text-text-secondary">
+                      {t('dashboard.playtime', { duration: formatPlaytime(game.playtime_minutes) })}
+                    </span>
+                  )}
+                </div>
               </div>
             </Link>
           ))}

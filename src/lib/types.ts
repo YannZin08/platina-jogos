@@ -36,6 +36,7 @@ export interface UserGame {
   progress_pct: number
   platinated: boolean
   favorite: boolean
+  playtime_minutes: number | null
   last_synced_at: string | null
 }
 
@@ -51,5 +52,6 @@ export type GameWithProgress = Game & {
   progress_pct: number
   platinated: boolean
   favorite: boolean
+  playtime_minutes: number | null
   last_synced_at: string | null
 }

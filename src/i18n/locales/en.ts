@@ -37,10 +37,12 @@ export const en: Record<keyof typeof pt, string> = {
   'dashboard.favoriteAdd': 'Add to favorites',
   'dashboard.favoriteRemove': 'Remove from favorites',
   'dashboard.noResults': 'No games found for "{{query}}"',
+  'dashboard.playtime': '{{duration}} played',
 
   'gameDetail.backLink': 'My games',
   'gameDetail.fallbackTitle': 'Game',
   'gameDetail.summary': '{{total}} achievements total, {{earned}} completed and {{missing}} not completed',
+  'gameDetail.playtime': '{{duration}} played',
   'gameDetail.filterAll': 'All',
   'gameDetail.filterDone': 'Completed',
   'gameDetail.filterPending': 'Not completed',
