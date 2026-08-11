@@ -7,6 +7,7 @@ import { GameCover } from '@/components/GameCover'
 import type { Game, Trophy, TrophyType } from '@/lib/types'
 
 type TrophyRow = Trophy & { earned: boolean; earned_at: string | null }
+type Filter = 'todas' | 'concluidas' | 'pendentes'
 
 const TIER_COLOR: Record<TrophyType, string> = {
   bronze: 'bg-bronze',
@@ -22,6 +23,7 @@ export default function GameDetail() {
   const [game, setGame] = React.useState<Game | null>(null)
   const [trophies, setTrophies] = React.useState<TrophyRow[]>([])
   const [loading, setLoading] = React.useState(true)
+  const [filter, setFilter] = React.useState<Filter>('todas')
 
   React.useEffect(() => {
     if (!id || !user) return
@@ -75,27 +77,51 @@ export default function GameDetail() {
       )}
       <h1 className="font-display mb-6 text-xl font-medium text-text">{game?.name ?? 'Jogo'}</h1>
 
+      {trophies.length > 0 && (
+        <div className="mb-4 flex gap-2">
+          {(['todas', 'concluidas', 'pendentes'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded-lg px-3.5 py-1.5 text-sm capitalize transition-colors ${
+                filter === f
+                  ? 'bg-accent/15 text-accent'
+                  : 'text-text-secondary hover:bg-surface'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className="space-y-2">
-        {trophies.map((trophy) => (
-          <div
-            key={trophy.id}
-            className={`flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 ${
-              trophy.earned ? '' : 'opacity-50'
-            }`}
-          >
-            {trophy.icon_url && !(trophy.hidden && !trophy.earned) ? (
-              <img src={trophy.icon_url} alt="" className="h-8 w-8 shrink-0 rounded-md bg-bg object-cover" />
-            ) : (
-              <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TIER_COLOR[trophy.type]}`} />
-            )}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm text-text">{trophy.hidden && !trophy.earned ? '???' : trophy.name}</p>
-              {trophy.description && !(trophy.hidden && !trophy.earned) && (
-                <p className="truncate text-xs text-text-secondary">{trophy.description}</p>
+        {trophies
+          .filter((trophy) => {
+            if (filter === 'concluidas') return trophy.earned
+            if (filter === 'pendentes') return !trophy.earned
+            return true
+          })
+          .map((trophy) => (
+            <div
+              key={trophy.id}
+              className={`flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 ${
+                trophy.earned ? '' : 'opacity-50'
+              }`}
+            >
+              {trophy.icon_url ? (
+                <img src={trophy.icon_url} alt="" className="h-8 w-8 shrink-0 rounded-md bg-bg object-cover" />
+              ) : (
+                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${TIER_COLOR[trophy.type]}`} />
               )}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm text-text">{trophy.name}</p>
+                {trophy.description && (
+                  <p className="truncate text-xs text-text-secondary">{trophy.description}</p>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
         {trophies.length === 0 && (
           <p className="py-8 text-center text-sm text-text-secondary">
