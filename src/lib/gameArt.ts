@@ -1,13 +1,12 @@
 import type { Game } from '@/lib/types'
 
-// A capa salva no banco pra jogos da Steam vem do ícone de biblioteca do
-// usuário (img_icon_url), que é minúsculo (32x32) e fica com qualidade ruim
-// em qualquer tamanho de card. A Steam serve a arte de loja de cada jogo por
-// uma URL previsível a partir do appid, então montamos ela na hora em vez de
-// depender do que foi salvo na sincronização.
-export function getGameCoverUrl(game: Pick<Game, 'platform' | 'external_id' | 'icon_url'>): string | null {
-  if (game.platform === 'steam') {
-    return `https://cdn.akamai.steamstatic.com/steam/apps/${game.external_id}/header.jpg`
-  }
-  return game.icon_url
+// steam-sync baixa e valida a capa no servidor antes de salvar, então um
+// icon_url vindo do bucket "game-covers" é sempre um banner em boa
+// resolução. Se não vier de lá (ícone pequeno salvo direto da Steam como
+// último recurso, quando nenhum banner foi encontrado), é um ícone pequeno
+// e esticar ele pra preencher o card inteiro fica borrado — por isso mantemos
+// a distinção pra escolher como renderizar em cada card.
+export function isBannerCover(game: Pick<Game, 'platform' | 'icon_url'>): boolean {
+  if (game.platform === 'psn') return true
+  return !!game.icon_url?.includes('/game-covers/')
 }

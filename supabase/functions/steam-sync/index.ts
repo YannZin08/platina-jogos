@@ -1,15 +1,50 @@
 // Busca os jogos e conquistas da Steam do usuário via API oficial da Valve e grava no banco.
 // Só sincroniza jogos com tempo de jogo > 0, pra manter o tempo de execução da function razoável
 // (uma biblioteca Steam grande pode ter centenas de jogos — dá pra paginar isso depois).
-import { createClient } from 'npm:@supabase/supabase-js@2'
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 
 const STEAM_API = 'https://api.steampowered.com'
+const COVER_BUCKET = 'game-covers'
 
 interface OwnedGame {
   appid: number
   name: string
   img_icon_url: string
   playtime_forever: number
+}
+
+// A Steam não garante a mesma URL de capa pra todo jogo (títulos mais novos
+// às vezes usam outro esquema de assets). Em vez de deixar o navegador do
+// usuário adivinhar e falhar, testamos os candidatos aqui no servidor uma
+// única vez, baixamos o que funcionar e guardamos no Storage do Supabase —
+// depois disso o card sempre carrega, sem depender da Steam responder na hora.
+function coverCandidates(appid: string): string[] {
+  return [
+    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+    `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/capsule_616x353.jpg`,
+  ]
+}
+
+async function cacheCover(admin: SupabaseClient, appid: string): Promise<string | null> {
+  for (const url of coverCandidates(appid)) {
+    try {
+      const res = await fetch(url)
+      const contentType = res.headers.get('content-type') ?? ''
+      if (!res.ok || !contentType.startsWith('image/')) continue
+
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      const path = `steam/${appid}.jpg`
+      const { error } = await admin.storage
+        .from(COVER_BUCKET)
+        .upload(path, bytes, { contentType, upsert: true })
+      if (error) continue
+
+      return admin.storage.from(COVER_BUCKET).getPublicUrl(path).data.publicUrl
+    } catch {
+      continue
+    }
+  }
+  return null
 }
 
 Deno.serve(async (req) => {
@@ -31,6 +66,10 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
     )
     const steamApiKey = Deno.env.get('STEAM_API_KEY')!
+
+    // Idempotente: se o bucket já existe, a Storage API retorna erro e
+    // ignoramos.
+    await admin.storage.createBucket(COVER_BUCKET, { public: true })
 
     const { data: steamAccount } = await admin
       .from('steam_accounts')
@@ -68,7 +107,7 @@ Deno.serve(async (req) => {
 
       let { data: game } = await admin
         .from('games')
-        .select('id')
+        .select('id, icon_url')
         .eq('platform', 'steam')
         .eq('external_id', appid)
         .maybeSingle()
@@ -90,21 +129,31 @@ Deno.serve(async (req) => {
         continue
       }
 
+      const fallbackIconUrl = ownedGame.img_icon_url
+        ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${ownedGame.img_icon_url}.jpg`
+        : null
+
       if (!game) {
+        const cachedCover = await cacheCover(admin, appid)
         const { data: inserted } = await admin
           .from('games')
           .insert({
             platform: 'steam',
             external_id: appid,
             name: ownedGame.name,
-            icon_url: ownedGame.img_icon_url
-              ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appid}/${ownedGame.img_icon_url}.jpg`
-              : null,
+            icon_url: cachedCover ?? fallbackIconUrl,
             has_platinum: true,
           })
-          .select('id')
+          .select('id, icon_url')
           .single()
         game = inserted
+      } else if (!game.icon_url?.includes(`/${COVER_BUCKET}/`)) {
+        // Jogo já cacheado antes dessa mudança: tenta migrar a capa uma vez.
+        const cachedCover = await cacheCover(admin, appid)
+        if (cachedCover) {
+          await admin.from('games').update({ icon_url: cachedCover }).eq('id', game.id)
+          game.icon_url = cachedCover
+        }
       }
 
       await admin.from('trophies').upsert(
