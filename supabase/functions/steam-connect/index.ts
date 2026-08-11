@@ -5,6 +5,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid/login'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 // Assina o user_id num "state" simples pra confirmar, no callback, quem iniciou
 // o login (a Steam não tem um parâmetro de state nativo como o OAuth2).
 async function sign(userId: string): Promise<string> {
@@ -29,6 +34,10 @@ async function verify(state: string): Promise<string | null> {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   const url = new URL(req.url)
   const functionUrl = `${url.origin}${url.pathname}`
   const siteUrl = Deno.env.get('SITE_URL')!
@@ -97,7 +106,10 @@ Deno.serve(async (req) => {
     data: { user },
   } = await supabaseUser.auth.getUser()
   if (!user) {
-    return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401 })
+    return new Response(JSON.stringify({ error: 'Não autenticado' }), {
+      status: 401,
+      headers: corsHeaders,
+    })
   }
 
   const state = await sign(user.id)
@@ -114,6 +126,6 @@ Deno.serve(async (req) => {
 
   return new Response(
     JSON.stringify({ redirectUrl: `${STEAM_OPENID_URL}?${params.toString()}` }),
-    { headers: { 'Content-Type': 'application/json' } },
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
   )
 })

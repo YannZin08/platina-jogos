@@ -6,6 +6,14 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 const STEAM_API = 'https://api.steampowered.com'
 const COVER_BUCKET = 'game-covers'
 
+// O navegador manda um preflight OPTIONS antes de qualquer chamada com
+// Authorization; sem isso ser respondido com esses headers, a chamada de
+// verdade (POST) nunca sai do navegador.
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 interface OwnedGame {
   appid: number
   name: string
@@ -48,6 +56,10 @@ async function cacheCover(admin: SupabaseClient, appid: string): Promise<string 
 }
 
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -58,7 +70,10 @@ Deno.serve(async (req) => {
       data: { user },
     } = await supabaseUser.auth.getUser()
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401 })
+      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
+        status: 401,
+        headers: corsHeaders,
+      })
     }
 
     const admin = createClient(
@@ -78,7 +93,10 @@ Deno.serve(async (req) => {
       .single()
 
     if (!steamAccount) {
-      return new Response(JSON.stringify({ error: 'Conta Steam não conectada' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Conta Steam não conectada' }), {
+        status: 400,
+        headers: corsHeaders,
+      })
     }
     const steamId = steamAccount.steam_id
 
@@ -232,10 +250,13 @@ Deno.serve(async (req) => {
           withoutAchievements: noAchievementsCount,
         },
       }),
-      { headers: { 'Content-Type': 'application/json' } },
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     )
   } catch (err) {
     console.error(err)
-    return new Response(JSON.stringify({ error: 'Falha ao sincronizar com a Steam.' }), { status: 500 })
+    return new Response(JSON.stringify({ error: 'Falha ao sincronizar com a Steam.' }), {
+      status: 500,
+      headers: corsHeaders,
+    })
   }
 })

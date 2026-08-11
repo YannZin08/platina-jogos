@@ -3,11 +3,23 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { exchangeNpssoForCode, exchangeCodeForAccessToken } from 'npm:psn-api'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { npsso } = await req.json()
     if (!npsso) {
-      return new Response(JSON.stringify({ error: 'NPSSO ausente' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'NPSSO ausente' }), {
+        status: 400,
+        headers: corsHeaders,
+      })
     }
 
     // Identifica o usuário do site a partir do token de sessão do Supabase
@@ -20,7 +32,10 @@ Deno.serve(async (req) => {
       data: { user },
     } = await supabaseUser.auth.getUser()
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401 })
+      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
+        status: 401,
+        headers: corsHeaders,
+      })
     }
 
     const code = await exchangeNpssoForCode(npsso)
@@ -43,13 +58,13 @@ Deno.serve(async (req) => {
     if (error) throw error
 
     return new Response(JSON.stringify({ ok: true }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
     console.error(err)
     return new Response(
       JSON.stringify({ error: 'Falha ao conectar com a PSN. Confira se o NPSSO ainda é válido.' }),
-      { status: 500 },
+      { status: 500, headers: corsHeaders },
     )
   }
 })

@@ -9,7 +9,16 @@ import {
   getUserTrophiesEarnedForTitle,
 } from 'npm:psn-api'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const supabaseUser = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -20,7 +29,10 @@ Deno.serve(async (req) => {
       data: { user },
     } = await supabaseUser.auth.getUser()
     if (!user) {
-      return new Response(JSON.stringify({ error: 'Não autenticado' }), { status: 401 })
+      return new Response(JSON.stringify({ error: 'Não autenticado' }), {
+        status: 401,
+        headers: corsHeaders,
+      })
     }
 
     const admin = createClient(
@@ -35,7 +47,10 @@ Deno.serve(async (req) => {
       .single()
 
     if (!psnAccount) {
-      return new Response(JSON.stringify({ error: 'Conta PSN não conectada' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Conta PSN não conectada' }), {
+        status: 400,
+        headers: corsHeaders,
+      })
     }
 
     const authorization = await exchangeRefreshTokenForAuthTokens(psnAccount.refresh_token)
@@ -139,10 +154,13 @@ Deno.serve(async (req) => {
       .eq('user_id', user.id)
 
     return new Response(JSON.stringify({ ok: true, synced: trophyTitles.length }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
     console.error(err)
-    return new Response(JSON.stringify({ error: 'Falha ao sincronizar com a PSN.' }), { status: 500 })
+    return new Response(JSON.stringify({ error: 'Falha ao sincronizar com a PSN.' }), {
+      status: 500,
+      headers: corsHeaders,
+    })
   }
 })
