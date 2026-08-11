@@ -23,15 +23,30 @@ export function GameCover({ game, className }: GameCoverProps) {
 
   if (stage === 'none') return null
 
-  const src = stage === 'primary' ? primary! : fallback!
+  // O ícone de fallback é pequeno (salvo em baixa resolução na sincronização);
+  // esticar ele pra preencher o banner inteiro (object-cover) deixa borrado,
+  // então aqui ele fica no tamanho original, centralizado no espaço do banner.
+  if (stage === 'fallback') {
+    return (
+      <div className={`flex items-center justify-center ${className ?? ''}`}>
+        <img
+          src={fallback!}
+          alt=""
+          loading="lazy"
+          className="h-12 w-12 rounded-md object-cover"
+          onError={() => setStage('none')}
+        />
+      </div>
+    )
+  }
 
   return (
     <img
-      src={src}
+      src={primary!}
       alt=""
       loading="lazy"
       className={className}
-      onError={() => setStage(stage === 'primary' && fallback ? 'fallback' : 'none')}
+      onError={() => setStage(fallback ? 'fallback' : 'none')}
     />
   )
 }
