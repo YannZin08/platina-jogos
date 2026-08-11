@@ -101,6 +101,11 @@ Deno.serve(async (req) => {
 
     let syncedCount = 0
     let noAchievementsCount = 0
+    // Baixar+cachear a capa de todo mundo numa unica execucao pode estourar
+    // o tempo limite da function quando ha muitos jogos ainda nao migrados.
+    // Limitamos quantas migracoes de capa rodam por sincronizacao; o resto
+    // completa nas proximas.
+    let coverBackfillBudget = 8
 
     for (const ownedGame of played) {
       const appid = String(ownedGame.appid)
@@ -147,8 +152,9 @@ Deno.serve(async (req) => {
           .select('id, icon_url')
           .single()
         game = inserted
-      } else if (!game.icon_url?.includes(`/${COVER_BUCKET}/`)) {
+      } else if (!game.icon_url?.includes(`/${COVER_BUCKET}/`) && coverBackfillBudget > 0) {
         // Jogo já cacheado antes dessa mudança: tenta migrar a capa uma vez.
+        coverBackfillBudget--
         const cachedCover = await cacheCover(admin, appid)
         if (cachedCover) {
           await admin.from('games').update({ icon_url: cachedCover }).eq('id', game.id)
