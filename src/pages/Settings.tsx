@@ -1,13 +1,13 @@
 import * as React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Check, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Check, ExternalLink, UserRound, KeyRound, Gamepad2, Globe } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { LANGUAGES, useLanguage } from '@/i18n/LanguageContext'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Avatar } from '@/components/Avatar'
 
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024
@@ -232,7 +232,10 @@ export default function Settings() {
         {t('settings.backLink')}
       </Link>
 
-      <h1 className="font-display mb-6 text-lg font-medium text-text">{t('settings.title')}</h1>
+      <div className="mb-8">
+        <h1 className="font-display text-lg font-medium text-text">{t('settings.title')}</h1>
+        <p className="mt-1 text-sm text-text-secondary">{t('settings.subtitle')}</p>
+      </div>
 
       {notice && (
         <p className="mb-4 rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
@@ -245,174 +248,211 @@ export default function Settings() {
         </p>
       )}
 
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.accountTitle')}</CardTitle>
-          </CardHeader>
+      <div className="space-y-8">
+        <section className="space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <UserRound className="h-4 w-4 text-text-secondary" />
+                {t('settings.profileTitle')}
+              </CardTitle>
+            </CardHeader>
 
-          <div className="mb-4 flex items-center gap-3">
-            <Avatar url={avatarUrl} label={username || user?.email || '?'} className="h-14 w-14 text-lg" />
-            <div>
-              <input
-                ref={avatarInputRef}
-                type="file"
-                accept="image/*"
-                onChange={uploadAvatar}
-                className="hidden"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={() => avatarInputRef.current?.click()}
-                disabled={uploadingAvatar}
-              >
-                {uploadingAvatar ? t('settings.uploadingAvatar') : t('settings.changeAvatar')}
-              </Button>
-            </div>
-          </div>
-
-          <form onSubmit={saveUsername} className="mb-4 space-y-1.5">
-            <Label htmlFor="username">{t('settings.usernameLabel')}</Label>
-            <div className="flex gap-2">
-              <Input
-                id="username"
-                value={usernameInput}
-                onChange={(e) => setUsernameInput(e.target.value)}
-                required
-              />
-              <Button
-                type="submit"
-                variant="secondary"
-                size="sm"
-                disabled={savingUsername || usernameInput.trim() === '' || usernameInput === username}
-              >
-                {savingUsername ? t('settings.savingUsername') : t('settings.saveUsername')}
-              </Button>
-            </div>
-          </form>
-
-          <p className="mb-4 text-sm text-text">
-            <span className="text-text-secondary">{t('settings.emailLabel')} </span>
-            {user?.email}
-          </p>
-
-          <div className="space-y-1.5">
-            <Label>{t('settings.passwordLabel')}</Label>
-            <div>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={requestPasswordReset}
-                disabled={sendingPasswordReset}
-              >
-                {sendingPasswordReset ? t('settings.sendingPasswordReset') : t('settings.changePassword')}
-              </Button>
-            </div>
-            <p className="text-xs text-text-secondary">{t('settings.changePasswordDescription')}</p>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.psnTitle')}</CardTitle>
-            {psnConnected && (
-              <span className="flex items-center gap-1 text-xs font-medium text-success">
-                <Check className="h-3.5 w-3.5" /> {t('settings.connected')}
-              </span>
-            )}
-          </CardHeader>
-
-          {!psnConnected ? (
-            <form onSubmit={connectPsn} className="space-y-3">
-              <p className="text-sm text-text-secondary">
-                {t('settings.psnDescriptionPrefix')}{' '}
-                <a
-                  href="https://www.playstation.com"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-0.5 text-accent hover:underline"
+            <div className="mb-5 flex items-center gap-4">
+              <Avatar url={avatarUrl} label={username || user?.email || '?'} className="h-16 w-16 text-lg" />
+              <div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={uploadAvatar}
+                  className="hidden"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
                 >
-                  playstation.com <ExternalLink className="h-3 w-3" />
-                </a>{' '}
-                {t('settings.psnDescriptionSuffix')}
-              </p>
-              <a
-                href="https://ca.account.sony.com/api/v1/ssocookie"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text hover:bg-surface-hover"
-              >
-                {t('settings.getNpsso')} <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-              <div className="space-y-1.5">
-                <Label htmlFor="npsso">{t('settings.npssoLabel')}</Label>
+                  {uploadingAvatar ? t('settings.uploadingAvatar') : t('settings.changeAvatar')}
+                </Button>
+              </div>
+            </div>
+
+            <form onSubmit={saveUsername} className="space-y-1.5">
+              <Label htmlFor="username">{t('settings.usernameLabel')}</Label>
+              <div className="flex gap-2">
                 <Input
-                  id="npsso"
-                  value={npsso}
-                  onChange={(e) => setNpsso(e.target.value)}
-                  placeholder={t('settings.npssoPlaceholder')}
+                  id="username"
+                  value={usernameInput}
+                  onChange={(e) => setUsernameInput(e.target.value)}
                   required
                 />
+                <Button
+                  type="submit"
+                  variant="secondary"
+                  size="sm"
+                  disabled={savingUsername || usernameInput.trim() === '' || usernameInput === username}
+                >
+                  {savingUsername ? t('settings.savingUsername') : t('settings.saveUsername')}
+                </Button>
               </div>
-              <Button type="submit" disabled={connectingPsn} size="sm">
-                {connectingPsn ? t('settings.connectingPsn') : t('settings.connectPsn')}
-              </Button>
             </form>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={syncPsn} disabled={syncingPsn}>
-              {syncingPsn ? t('settings.syncingNow') : t('settings.syncNow')}
-            </Button>
-          )}
-        </Card>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.steamTitle')}</CardTitle>
-            {steamConnected && (
-              <span className="flex items-center gap-1 text-xs font-medium text-success">
-                <Check className="h-3.5 w-3.5" /> {t('settings.connected')}
-              </span>
-            )}
-          </CardHeader>
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <KeyRound className="h-4 w-4 text-text-secondary" />
+                {t('settings.accountTitle')}
+              </CardTitle>
+            </CardHeader>
 
-          {!steamConnected ? (
-            <>
-              <p className="mb-3 text-sm text-text-secondary">{t('settings.steamDescription')}</p>
-              <Button variant="secondary" size="sm" onClick={connectSteam} disabled={connectingSteam}>
-                {connectingSteam ? t('settings.redirecting') : t('settings.loginWithSteam')}
-              </Button>
-            </>
-          ) : (
-            <Button variant="secondary" size="sm" onClick={syncSteam} disabled={syncingSteam}>
-              {syncingSteam ? t('settings.syncingNow') : t('settings.syncNow')}
-            </Button>
-          )}
-        </Card>
+            <div className="mb-5 space-y-1">
+              <Label>{t('settings.emailLabel')}</Label>
+              <p className="text-sm text-text">{user?.email}</p>
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('settings.languageTitle')}</CardTitle>
-          </CardHeader>
-          <p className="mb-3 text-sm text-text-secondary">{t('settings.languageDescription')}</p>
-          <div className="flex flex-wrap gap-2">
-            {LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                onClick={() => setLocale(lang.code)}
-                className={`rounded-lg border px-3.5 py-1.5 text-sm transition-colors ${
-                  locale === lang.code
-                    ? 'border-accent/30 bg-accent/15 text-accent'
-                    : 'border-border text-text-secondary hover:bg-surface'
-                }`}
-              >
-                {lang.label}
-              </button>
-            ))}
+            <div className="space-y-1.5">
+              <Label>{t('settings.passwordLabel')}</Label>
+              <div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={requestPasswordReset}
+                  disabled={sendingPasswordReset}
+                >
+                  {sendingPasswordReset ? t('settings.sendingPasswordReset') : t('settings.changePassword')}
+                </Button>
+              </div>
+              <CardDescription className="text-xs">{t('settings.changePasswordDescription')}</CardDescription>
+            </div>
+          </Card>
+        </section>
+
+        <section>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-secondary">
+            {t('settings.connectedAccountsLabel')}
+          </p>
+
+          <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  <Gamepad2 className="h-4 w-4 text-text-secondary" />
+                  {t('settings.psnTitle')}
+                </CardTitle>
+                {psnConnected && (
+                  <span className="flex items-center gap-1 text-xs font-medium text-success">
+                    <Check className="h-3.5 w-3.5" /> {t('settings.connected')}
+                  </span>
+                )}
+              </CardHeader>
+
+              {!psnConnected ? (
+                <form onSubmit={connectPsn} className="space-y-3">
+                  <CardDescription>
+                    {t('settings.psnDescriptionPrefix')}{' '}
+                    <a
+                      href="https://www.playstation.com"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-0.5 text-accent hover:underline"
+                    >
+                      playstation.com <ExternalLink className="h-3 w-3" />
+                    </a>{' '}
+                    {t('settings.psnDescriptionSuffix')}
+                  </CardDescription>
+                  <a
+                    href="https://ca.account.sony.com/api/v1/ssocookie"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm text-text hover:bg-surface-hover"
+                  >
+                    {t('settings.getNpsso')} <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="npsso">{t('settings.npssoLabel')}</Label>
+                    <Input
+                      id="npsso"
+                      value={npsso}
+                      onChange={(e) => setNpsso(e.target.value)}
+                      placeholder={t('settings.npssoPlaceholder')}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" disabled={connectingPsn} size="sm">
+                    {connectingPsn ? t('settings.connectingPsn') : t('settings.connectPsn')}
+                  </Button>
+                </form>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={syncPsn} disabled={syncingPsn}>
+                  {syncingPsn ? t('settings.syncingNow') : t('settings.syncNow')}
+                </Button>
+              )}
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>
+                  <Gamepad2 className="h-4 w-4 text-text-secondary" />
+                  {t('settings.steamTitle')}
+                </CardTitle>
+                {steamConnected && (
+                  <span className="flex items-center gap-1 text-xs font-medium text-success">
+                    <Check className="h-3.5 w-3.5" /> {t('settings.connected')}
+                  </span>
+                )}
+              </CardHeader>
+
+              {!steamConnected ? (
+                <>
+                  <CardDescription className="mb-3">{t('settings.steamDescription')}</CardDescription>
+                  <Button variant="secondary" size="sm" onClick={connectSteam} disabled={connectingSteam}>
+                    {connectingSteam ? t('settings.redirecting') : t('settings.loginWithSteam')}
+                  </Button>
+                </>
+              ) : (
+                <Button variant="secondary" size="sm" onClick={syncSteam} disabled={syncingSteam}>
+                  {syncingSteam ? t('settings.syncingNow') : t('settings.syncNow')}
+                </Button>
+              )}
+            </Card>
           </div>
-        </Card>
+        </section>
+
+        <section>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-secondary">
+            {t('settings.preferencesLabel')}
+          </p>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                <Globe className="h-4 w-4 text-text-secondary" />
+                {t('settings.languageTitle')}
+              </CardTitle>
+            </CardHeader>
+            <CardDescription className="mb-3">{t('settings.languageDescription')}</CardDescription>
+            <div className="flex flex-wrap gap-2">
+              {LANGUAGES.map((lang) => (
+                <button
+                  key={lang.code}
+                  onClick={() => setLocale(lang.code)}
+                  className={`rounded-lg border px-3.5 py-1.5 text-sm transition-colors ${
+                    locale === lang.code
+                      ? 'border-accent/30 bg-accent/15 text-accent'
+                      : 'border-border text-text-secondary hover:bg-surface'
+                  }`}
+                >
+                  {lang.label}
+                </button>
+              ))}
+            </div>
+          </Card>
+        </section>
       </div>
     </div>
   )

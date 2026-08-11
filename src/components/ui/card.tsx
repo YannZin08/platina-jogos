@@ -17,8 +17,12 @@ export function CardHeader({ className, ...props }: React.HTMLAttributes<HTMLDiv
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
   return (
     <h3
-      className={cn('font-display text-base font-medium text-text', className)}
+      className={cn('font-display flex items-center gap-2 text-base font-medium text-text', className)}
       {...props}
     />
   )
+}
+
+export function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  return <p className={cn('text-sm text-text-secondary', className)} {...props} />
 }
