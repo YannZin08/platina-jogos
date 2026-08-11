@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Settings() {
-  const { user, signOut } = useAuth()
+  const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const [npsso, setNpsso] = React.useState('')
   const [username, setUsername] = React.useState<string | null>(null)
@@ -235,10 +235,6 @@ export default function Settings() {
             </Button>
           )}
         </Card>
-
-        <button onClick={signOut} className="pt-2 text-sm text-text-secondary hover:text-text">
-          Sair da conta
-        </button>
       </div>
     </div>
   )

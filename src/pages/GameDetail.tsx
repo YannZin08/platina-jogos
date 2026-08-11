@@ -67,7 +67,12 @@ export default function GameDetail() {
         Meus jogos
       </Link>
 
-      <h1 className="font-display mb-6 text-xl font-medium text-text">{game?.name ?? 'Jogo'}</h1>
+      <div className="mb-6 flex items-center gap-3">
+        {game?.icon_url && (
+          <img src={game.icon_url} alt="" className="h-12 w-12 rounded-lg bg-surface object-cover" />
+        )}
+        <h1 className="font-display text-xl font-medium text-text">{game?.name ?? 'Jogo'}</h1>
+      </div>
 
       <div className="space-y-2">
         {trophies.map((trophy) => (

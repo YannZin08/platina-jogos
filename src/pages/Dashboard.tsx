@@ -109,11 +109,22 @@ export default function Dashboard() {
               to={`/games/${game.id}`}
               className="rounded-xl border border-border bg-surface p-4 transition-colors hover:border-border-strong"
             >
-              <div className="mb-2.5 flex items-center justify-between gap-2">
-                <span className="truncate text-sm font-medium text-text">{game.name}</span>
-                <span className="shrink-0 rounded-md bg-bg px-2 py-0.5 text-[11px] text-text-secondary">
-                  {game.platform === 'psn' ? 'PSN' : 'Steam'}
-                </span>
+              <div className="mb-2.5 flex items-center gap-3">
+                {game.icon_url ? (
+                  <img
+                    src={game.icon_url}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-lg bg-bg object-cover"
+                  />
+                ) : (
+                  <div className="h-10 w-10 shrink-0 rounded-lg bg-bg" />
+                )}
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <span className="truncate text-sm font-medium text-text">{game.name}</span>
+                  <span className="shrink-0 rounded-md bg-bg px-2 py-0.5 text-[11px] text-text-secondary">
+                    {game.platform === 'psn' ? 'PSN' : 'Steam'}
+                  </span>
+                </div>
               </div>
 
               <div className="mb-2.5 h-1.5 overflow-hidden rounded-full bg-bg">
