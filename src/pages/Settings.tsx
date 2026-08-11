@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { Avatar } from '@/components/Avatar'
+
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024
 
 export default function Settings() {
   const { user, resetPassword } = useAuth()
@@ -18,6 +21,9 @@ export default function Settings() {
   const [usernameInput, setUsernameInput] = React.useState('')
   const [savingUsername, setSavingUsername] = React.useState(false)
   const [sendingPasswordReset, setSendingPasswordReset] = React.useState(false)
+  const [avatarUrl, setAvatarUrl] = React.useState<string | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = React.useState(false)
+  const avatarInputRef = React.useRef<HTMLInputElement>(null)
   const [psnConnected, setPsnConnected] = React.useState(false)
   const [steamConnected, setSteamConnected] = React.useState(false)
   const [connectingPsn, setConnectingPsn] = React.useState(false)
@@ -30,12 +36,13 @@ export default function Settings() {
   const refreshStatus = React.useCallback(async () => {
     if (!user) return
     const [profile, psn, steam] = await Promise.all([
-      supabase.from('profiles').select('username').eq('id', user.id).maybeSingle(),
+      supabase.from('profiles').select('username, avatar_url').eq('id', user.id).maybeSingle(),
       supabase.from('psn_accounts').select('user_id').eq('user_id', user.id).maybeSingle(),
       supabase.from('steam_accounts').select('user_id').eq('user_id', user.id).maybeSingle(),
     ])
     setUsername(profile.data?.username ?? null)
     setUsernameInput(profile.data?.username ?? '')
+    setAvatarUrl(profile.data?.avatar_url ?? null)
     setPsnConnected(!!psn.data)
     setSteamConnected(!!steam.data)
   }, [user])
@@ -74,6 +81,55 @@ export default function Settings() {
     } else {
       setUsername(usernameInput.trim())
       setNotice(t('settings.noticeUsernameSaved'))
+    }
+  }
+
+  async function uploadAvatar(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !user) return
+
+    if (!file.type.startsWith('image/')) {
+      setError(t('settings.errorAvatarType'))
+      return
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setError(t('settings.errorAvatarSize'))
+      return
+    }
+
+    setError(null)
+    setUploadingAvatar(true)
+
+    const extension = file.name.split('.').pop() || 'jpg'
+    const path = `${user.id}/avatar.${extension}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(path, file, { upsert: true, contentType: file.type })
+
+    if (uploadError) {
+      setUploadingAvatar(false)
+      setError(t('settings.errorAvatarUpload'))
+      return
+    }
+
+    // Cache-bust: o caminho não muda entre uploads, então sem isso o
+    // navegador (e o CDN) continuariam mostrando a imagem antiga.
+    const { data } = supabase.storage.from('avatars').getPublicUrl(path)
+    const publicUrl = `${data.publicUrl}?t=${Date.now()}`
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({ avatar_url: publicUrl })
+      .eq('id', user.id)
+
+    setUploadingAvatar(false)
+    if (updateError) {
+      setError(t('settings.errorAvatarUpload'))
+    } else {
+      setAvatarUrl(publicUrl)
+      setNotice(t('settings.noticeAvatarSaved'))
     }
   }
 
@@ -194,6 +250,28 @@ export default function Settings() {
           <CardHeader>
             <CardTitle>{t('settings.accountTitle')}</CardTitle>
           </CardHeader>
+
+          <div className="mb-4 flex items-center gap-3">
+            <Avatar url={avatarUrl} label={username || user?.email || '?'} className="h-14 w-14 text-lg" />
+            <div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={uploadAvatar}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => avatarInputRef.current?.click()}
+                disabled={uploadingAvatar}
+              >
+                {uploadingAvatar ? t('settings.uploadingAvatar') : t('settings.changeAvatar')}
+              </Button>
+            </div>
+          </div>
 
           <form onSubmit={saveUsername} className="mb-4 space-y-1.5">
             <Label htmlFor="username">{t('settings.usernameLabel')}</Label>

@@ -1,8 +1,29 @@
+import * as React from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { useLanguage } from '@/i18n/LanguageContext'
+import { supabase } from '@/lib/supabase'
+import { Avatar } from '@/components/Avatar'
 
 export function AppHeader() {
-  const { signOut } = useAuth()
+  const { user, signOut } = useAuth()
+  const { t } = useLanguage()
+  const [profile, setProfile] = React.useState<{ username: string | null; avatar_url: string | null }>({
+    username: null,
+    avatar_url: null,
+  })
+
+  React.useEffect(() => {
+    if (!user) return
+    supabase
+      .from('profiles')
+      .select('username, avatar_url')
+      .eq('id', user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setProfile(data)
+      })
+  }, [user])
 
   return (
     <header className="border-b border-border bg-surface/50">
@@ -22,23 +43,24 @@ export function AppHeader() {
               }`
             }
           >
-            Meus jogos
+            {t('dashboard.title')}
           </NavLink>
           <NavLink
             to="/settings"
             className={({ isActive }) =>
-              `rounded-lg px-3 py-1.5 transition-colors ${
+              `flex items-center gap-2 rounded-lg px-3 py-1.5 transition-colors ${
                 isActive ? 'bg-accent/15 text-accent' : 'text-text-secondary hover:text-text'
               }`
             }
           >
-            Configurações
+            <Avatar url={profile.avatar_url} label={profile.username || user?.email || '?'} className="h-5 w-5 text-[10px]" />
+            {t('settings.title')}
           </NavLink>
           <button
             onClick={signOut}
             className="ml-1 rounded-lg px-3 py-1.5 text-text-secondary transition-colors hover:text-text"
           >
-            Sair
+            {t('settings.signOut')}
           </button>
         </nav>
       </div>
