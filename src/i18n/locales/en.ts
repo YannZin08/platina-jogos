@@ -35,6 +35,7 @@ export const en: Record<keyof typeof pt, string> = {
   'dashboard.searchPlaceholder': 'Search games…',
   'dashboard.sortProgress': 'Progress',
   'dashboard.sortRecent': 'Recent',
+  'dashboard.sortPlaytime': 'Most played',
   'dashboard.favoriteAdd': 'Add to favorites',
   'dashboard.favoriteRemove': 'Remove from favorites',
   'dashboard.noResults': 'No games found for "{{query}}"',

@@ -34,6 +34,7 @@ export const pt = {
   'dashboard.searchPlaceholder': 'Buscar jogo…',
   'dashboard.sortProgress': 'Progresso',
   'dashboard.sortRecent': 'Recentes',
+  'dashboard.sortPlaytime': 'Mais jogadas',
   'dashboard.favoriteAdd': 'Favoritar',
   'dashboard.favoriteRemove': 'Remover dos favoritos',
   'dashboard.noResults': 'Nenhum jogo encontrado para "{{query}}"',

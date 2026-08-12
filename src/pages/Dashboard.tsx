@@ -12,7 +12,7 @@ import type { Game, GameWithProgress } from '@/lib/types'
 
 type Filter = 'todos' | 'platinados' | 'pendentes'
 type PlatformFilter = 'todas' | 'psn' | 'steam'
-type Sort = 'recent' | 'progress' | null
+type Sort = 'recent' | 'progress' | 'playtime' | null
 
 export default function Dashboard() {
   const { user } = useAuth()
@@ -110,6 +110,9 @@ export default function Dashboard() {
       } else if (sort === 'recent') {
         const diff = (b.last_synced_at ?? '').localeCompare(a.last_synced_at ?? '')
         if (diff !== 0) return diff
+      } else if (sort === 'playtime') {
+        const diff = (b.playtime_minutes ?? 0) - (a.playtime_minutes ?? 0)
+        if (diff !== 0) return diff
       }
       // Ordem alfabética sempre como base/critério de desempate.
       return a.name.localeCompare(b.name)
@@ -130,6 +133,7 @@ export default function Dashboard() {
   const SORT_LABEL: Record<Exclude<Sort, null>, string> = {
     recent: t('dashboard.sortRecent'),
     progress: t('dashboard.sortProgress'),
+    playtime: t('dashboard.sortPlaytime'),
   }
 
   return (
@@ -170,7 +174,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex gap-2">
-              {(['recent', 'progress'] as const).map((s) => (
+              {(['recent', 'progress', 'playtime'] as const).map((s) => (
                 <button
                   key={s}
                   onClick={() => setSort(sort === s ? null : s)}
