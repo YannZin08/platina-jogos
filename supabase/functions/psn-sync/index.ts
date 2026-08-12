@@ -80,7 +80,16 @@ Deno.serve(async (req) => {
         .eq('user_id', user.id)
     }
 
-    const { trophyTitles } = await getUserTitles(authorization, 'me')
+    // getUserTitles pagina no máximo 800 títulos por chamada; sem esse loop,
+    // usuários com biblioteca grande ficavam com jogos de fora da primeira
+    // página sem sincronizar.
+    const trophyTitles: Awaited<ReturnType<typeof getUserTitles>>['trophyTitles'] = []
+    let offset: number | undefined = 0
+    while (offset !== undefined) {
+      const page = await getUserTitles(authorization, 'me', { limit: 800, offset })
+      trophyTitles.push(...page.trophyTitles)
+      offset = page.nextOffset
+    }
 
     // Busca tempo jogado à parte (endpoint diferente do de troféus) e monta
     // um mapa por nome normalizado pra cruzar com cada trophy title abaixo.
